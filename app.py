@@ -635,6 +635,144 @@ def inject_css() -> None:
             margin: 18px 0;
         }
 
+        .launch-panel, .report-reader, .artifact-card, .file-card, .timeline-card {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.68);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+        }
+
+        .launch-panel {
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+
+        .file-card, .artifact-card {
+            padding: 14px;
+            margin: 8px 0;
+            transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+        }
+
+        .file-card:hover, .artifact-card:hover, .solution-card:hover {
+            transform: translateY(-1px);
+            border-color: rgba(34, 211, 238, 0.34);
+            box-shadow: 0 16px 48px rgba(8, 145, 178, 0.14);
+        }
+
+        .file-row, .artifact-row, .timeline-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .file-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            background: rgba(34, 211, 238, 0.12);
+            border: 1px solid rgba(34, 211, 238, 0.22);
+            color: #a5f3fc;
+            font-weight: 900;
+        }
+
+        .score-bar {
+            margin-top: 9px;
+        }
+
+        .score-line {
+            display: flex;
+            justify-content: space-between;
+            color: #cbd5e1;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .score-track {
+            height: 7px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(51, 65, 85, 0.78);
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #22d3ee, #60a5fa, #a78bfa);
+            box-shadow: 0 0 18px rgba(34, 211, 238, 0.30);
+        }
+
+        .agent-timeline {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+            gap: 10px;
+            margin: 14px 0 18px;
+        }
+
+        .timeline-card {
+            padding: 13px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timeline-card.completed {
+            border-color: rgba(34, 211, 238, 0.38);
+            box-shadow: 0 0 28px rgba(34, 211, 238, 0.12);
+        }
+
+        .timeline-card.failed {
+            border-color: rgba(251, 113, 133, 0.45);
+            box-shadow: 0 0 28px rgba(251, 113, 133, 0.14);
+        }
+
+        .timeline-card.pending {
+            opacity: 0.58;
+        }
+
+        .timeline-card.running::after {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border-radius: 8px;
+            border: 1px solid rgba(34, 211, 238, 0.65);
+            animation: pulse-ring 1.4s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-ring {
+            0% { opacity: 0.28; transform: scale(0.99); }
+            50% { opacity: 0.9; transform: scale(1.01); }
+            100% { opacity: 0.28; transform: scale(0.99); }
+        }
+
+        .terminal-dots span {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .dot-red { background: #fb7185; }
+        .dot-yellow { background: #fbbf24; }
+        .dot-green { background: #34d399; }
+
+        .report-reader {
+            padding: 18px;
+        }
+
+        .report-reader h1, .report-reader h2, .report-reader h3 {
+            color: #e0f2fe;
+        }
+
+        .report-reader table {
+            color: #dbeafe;
+            border-color: rgba(148, 163, 184, 0.28);
+        }
+
         div[data-testid="stTabs"] button {
             color: #94a3b8;
             font-weight: 720;
@@ -841,6 +979,49 @@ def require_active_state(state: dict[str, Any], title: str, body: str) -> bool:
     return False
 
 
+def is_expert_mode() -> bool:
+    return bool(st.session_state.get("expert_mode", False))
+
+
+def format_file_size(size: int | float | None) -> str:
+    if size is None:
+        return "-"
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} B"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
+def safe_relative_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return path.name
+
+
+def file_metadata(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"name": path.name, "suffix": path.suffix.lower() or "-", "size": None, "modified": "-"}
+    stat = path.stat()
+    return {
+        "name": path.name,
+        "suffix": path.suffix.lower() or "-",
+        "size": stat.st_size,
+        "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def markdown_headings(markdown: str) -> list[tuple[int, str]]:
+    headings: list[tuple[int, str]] = []
+    for line in markdown.splitlines():
+        match = re.match(r"^(#{1,3})\s+(.+)$", line.strip())
+        if match:
+            headings.append((len(match.group(1)), match.group(2).strip()))
+    return headings[:24]
+
+
 def as_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
@@ -902,13 +1083,30 @@ def render_metric_card(label: str, value: Any, caption: str = "", icon: str = "A
     )
 
 
-def render_empty_state(title: str, body: str) -> None:
+def render_empty_state(title: str, body: str, action: str | None = None) -> None:
+    action_html = f'<div style="margin-top:10px;">{pill(action, "info")}</div>' if action else ""
     st.markdown(
         f"""
         <div class="empty-state">
             {pill("Awaiting Agent Run", "info")}
             <strong>{h(title)}</strong><br/>
             {h(body)}
+            {action_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_error_state(title: str, error: str, hint: str | None = None) -> None:
+    hint_html = f'<div class="muted-line" style="margin-top:8px;">{h(hint)}</div>' if hint else ""
+    st.markdown(
+        f"""
+        <div class="empty-state" style="border-color:rgba(251,113,133,.42); background:rgba(127,29,29,.22);">
+            {pill("Action Required", "danger")}
+            <strong>{h(title)}</strong><br/>
+            {h(error)}
+            {hint_html}
         </div>
         """,
         unsafe_allow_html=True,
@@ -929,6 +1127,52 @@ def render_soft_card(title: str, body: str, tags: list[str] | None = None) -> No
     )
 
 
+def render_score_bar(label: str, value: Any, max_value: float = 100) -> None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return
+    scale = max_value
+    if numeric <= 5:
+        scale = 5
+    elif numeric <= 10:
+        scale = 10
+    pct = max(0.0, min(numeric / scale * 100, 100.0))
+    st.markdown(
+        f"""
+        <div class="score-bar">
+            <div class="score-line"><span>{h(label)}</span><span>{h(value)}</span></div>
+            <div class="score-track"><div class="score-fill" style="width:{pct:.1f}%"></div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_file_card(path: Path, label: str = "") -> None:
+    meta = file_metadata(path)
+    suffix = meta["suffix"].lstrip(".").upper() or "FILE"
+    expert_path = f'<div class="muted-line">{h(safe_relative_path(path))}</div>' if is_expert_mode() else ""
+    st.markdown(
+        f"""
+        <div class="file-card">
+            <div class="file-row">
+                <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                    <div class="file-icon">{h(suffix[:4])}</div>
+                    <div style="min-width:0;">
+                        <div class="card-title">{h(meta["name"])}</div>
+                        <div class="muted-line">{h(label or "Uploaded")} · {h(meta["suffix"])} · {h(format_file_size(meta["size"]))} · {h(meta["modified"])}</div>
+                        {expert_path}
+                    </div>
+                </div>
+                {pill("Ready", "ok")}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_terminal_block(title: str, content: str, tone: str = "neutral", meta: str = "") -> None:
     tone_class = "terminal-ok" if tone == "ok" else "terminal-danger" if tone == "danger" else ""
     safe_content = h(content or "(empty)")
@@ -936,6 +1180,7 @@ def render_terminal_block(title: str, content: str, tone: str = "neutral", meta:
         f"""
         <div class="terminal-card {tone_class}">
             <div class="terminal-header">
+                <span class="terminal-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span></span>
                 <span>{h(title)}</span>
                 <span>{h(meta)}</span>
             </div>
@@ -965,6 +1210,81 @@ def render_download_button(label: str, path: Path, file_name: str | None = None)
             file_name=file_name or path.name,
             use_container_width=True,
         )
+
+
+def artifact_counts(state: dict[str, Any]) -> dict[str, int]:
+    code_dir = get_output_path(state, "code_dir", CODE_DIR)
+    figures_dir = get_output_path(state, "figures_dir", FIGURES_DIR)
+    logs_dir = get_output_path(state, "logs_dir", LOGS_DIR)
+    return {
+        "reports": int(report_artifacts_visible()),
+        "figures": len(list_figures(figures_dir)) if state else 0,
+        "code": len(visible_artifact_files(sorted(code_dir.glob("*.py")))) if state and code_dir.exists() else 0,
+        "logs": len(visible_artifact_files(sorted(path for path in logs_dir.glob("*") if path.suffix.lower() in {".json", ".jsonl"}))) if state and logs_dir.exists() else 0,
+    }
+
+
+def render_agent_timeline(state: dict[str, Any], running_step: str | None = None) -> None:
+    execution_result = state.get("execution_result") or {}
+    logs_dir = get_output_path(state, "logs_dir", LOGS_DIR)
+    parts = ['<div class="agent-timeline">']
+    for label, key, short_label in WORKFLOW_STEPS:
+        complete = False
+        failed = False
+        if key == "file_loader":
+            complete = bool(state.get("raw_problem"))
+        elif key == "execution_result" and execution_result:
+            complete = True
+            failed = not bool(execution_result.get("success", False))
+        else:
+            complete = state.get(key) not in (None, {}, [])
+        status = "running" if running_step == key else "failed" if failed else "completed" if complete else "pending"
+        log_ready = logs_dir.exists() and bool(visible_artifact_files(sorted(logs_dir.glob("*.json*")))) and state
+        artifact_ready = complete and key in {"execution_result", "paper", "figure_plan", "data_profile"}
+        parts.append(
+            f"""
+            <div class="timeline-card {status}">
+                <div class="timeline-row">
+                    <div>
+                        <div class="card-title">{h(label)}</div>
+                        <div class="muted-line">{h(short_label)} · {h(status)}</div>
+                    </div>
+                    {pill("Log Ready", "info") if log_ready else pill("Pending", "neutral")}
+                </div>
+                <div style="margin-top:8px;">{pill("Artifact Ready", "ok") if artifact_ready else ""}</div>
+            </div>
+            """
+        )
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def render_artifact_overview(state: dict[str, Any]) -> None:
+    counts = artifact_counts(state)
+    render_section_header("Artifact Overview", "产物概览", "当前有效运行生成的报告、图表、代码和日志。")
+    cols = st.columns(4)
+    cards = [
+        ("Reports", counts["reports"], "solution_report.*", REPORTS_DIR, "DOC"),
+        ("Figures", counts["figures"], "SVG / PNG / JPG", FIGURES_DIR, "FIG"),
+        ("Code", counts["code"], "Python files", CODE_DIR, "PY"),
+        ("Logs", counts["logs"], "JSON / JSONL", LOGS_DIR, "LOG"),
+    ]
+    for idx, (title, count, caption, path, icon) in enumerate(cards):
+        with cols[idx]:
+            st.markdown(
+                f"""
+                <div class="artifact-card">
+                    <div class="metric-icon">{h(icon)}</div>
+                    <div class="metric-label">{h(title)}</div>
+                    <div class="metric-value">{h(count)}</div>
+                    <div class="metric-caption">{h(caption)}</div>
+                    <div style="margin-top:8px;">{pill("Ready", "ok") if count else pill("Pending", "warn")}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if count and path.exists():
+                st.download_button(f"下载 {title}", make_zip([path]), file_name=f"{title.lower()}.zip", key=f"artifact-{title}", use_container_width=True)
 
 
 def sidebar_section(label: str) -> None:
@@ -1043,6 +1363,8 @@ def render_sidebar() -> dict[str, Any]:
             """,
             unsafe_allow_html=True,
         )
+        expert_mode = st.toggle("Expert Mode", value=bool(st.session_state.get("expert_mode", False)))
+        st.session_state["expert_mode"] = expert_mode
         use_rag = st.toggle("RAG Retrieval", value=False)
         enable_reflection = st.toggle("Reflection Loop", value=True)
         export_docx = st.toggle("Export Word", value=False)
@@ -1068,11 +1390,11 @@ def render_sidebar() -> dict[str, Any]:
         )
         if problem_upload is not None:
             problem_path = save_uploaded_file(problem_upload, upload_dir / "problem")
-            st.caption(f"题面：{problem_upload.name}")
+            render_file_card(problem_path, "Problem statement")
         if data_uploads:
             data_path = save_data_uploads(data_uploads, upload_dir / "data")
             for uploaded in data_uploads:
-                st.caption(f"数据：{uploaded.name}")
+                render_file_card((data_path / sanitize_filename(uploaded.name)) if data_path else Path(uploaded.name), "Data file")
         else:
             st.caption("未上传数据文件时，系统将仅基于题面文本进行建模。")
 
@@ -1139,10 +1461,37 @@ def run_workflow(config: dict[str, Any]) -> None:
         st.caption(f"详细错误：{type(exc).__name__}: {exc}")
         st.stop()
 
-    progress = st.progress(0)
+    st.markdown(
+        """
+        <div class="launch-panel">
+            <div class="section-kicker">Agent is working...</div>
+            <div class="section-title">DeepSeek connected</div>
+            <div class="section-caption">The backend workflow is running. Stage labels below are UI-side progress hints.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    progress = st.progress(0, text="Preparing inputs")
     status = st.empty()
-    status.info("正在准备输入文件和运行环境。")
-    progress.progress(8)
+    timeline_slot = st.empty()
+    log_preview = st.empty()
+
+    def update_run_status(message: str, pct: int, step_key: str) -> None:
+        status.info(message)
+        progress.progress(pct, text=message)
+        with timeline_slot.container():
+            render_agent_timeline({}, running_step=step_key)
+        log_preview.markdown(
+            f"""
+            <div class="terminal-card terminal-ok">
+                <div class="terminal-header"><span class="terminal-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span></span><span>Run Preview</span><span>{pct}%</span></div>
+                <div class="terminal-body">{h(message)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    update_run_status("Parsing problem", 10, "parsed_problem")
 
     try:
         runner = WorkflowRunner(
@@ -1155,17 +1504,29 @@ def run_workflow(config: dict[str, Any]) -> None:
             export_docx=bool(config["export_docx"]),
             export_pdf=bool(config["export_pdf"]),
         )
-        status.info("工作流运行中：题目解析、数据画像、策略生成、代码执行和报告生成会连续完成。")
-        progress.progress(22)
+        update_run_status("Profiling data and generating strategy", 28, "candidate_strategies")
+        update_run_status("Executing code and repairing if needed", 54, "execution_result")
+        update_run_status("Writing report", 78, "paper")
         state = runner.run(problem_path, data_path)
-        progress.progress(100)
-        status.success("运行完成。")
         st.session_state["last_state"] = state
         st.session_state["effective_provider"] = effective_provider
+        progress.progress(100, text="Run completed")
+        status.success("运行完成。")
+        counts = artifact_counts(state.to_json_dict() if hasattr(state, "to_json_dict") else state_to_dict(state))
+        st.markdown(
+            f"""
+            <div class="artifact-card">
+                <div class="card-title">Agent Run Completed</div>
+                <div class="muted-line">Report: {h((state.paper or {}).get('report_path', '-')) if hasattr(state, 'paper') else '-'}</div>
+                <div style="margin-top:8px;">{pill(str(counts.get('figures', 0)) + ' figures', 'info')}{pill(str(counts.get('code', 0)) + ' code files', 'info')}{pill(str(counts.get('logs', 0)) + ' logs', 'info')}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     except Exception as exc:  # noqa: BLE001
-        progress.progress(100)
+        progress.progress(100, text="Run failed")
         status.error(f"工作流运行失败：{type(exc).__name__}: {exc}")
-        st.info(f"可查看日志目录：{LOGS_DIR}")
+        render_error_state("Agent Run Failed", f"{type(exc).__name__}: {exc}", f"请查看日志目录：{LOGS_DIR}")
         st.stop()
 
 
@@ -1198,6 +1559,71 @@ def list_figures(figures_dir: Path) -> list[Path]:
     ))
 
 
+def render_new_modeling_run(config: dict[str, Any]) -> None:
+    render_section_header("New Modeling Run", "新任务启动台", "上传赛题和数据，配置运行参数，然后启动 Agent。")
+    st.markdown('<div class="launch-panel">', unsafe_allow_html=True)
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        render_error_state(
+            "DeepSeek API Key 未配置",
+            "当前无法启动正式求解。请先配置 DEEPSEEK_API_KEY。",
+            'PowerShell: $env:DEEPSEEK_API_KEY="你的key"；macOS/Linux: export DEEPSEEK_API_KEY="你的key"',
+        )
+    left, right = st.columns([1.1, 0.9])
+    with left:
+        st.markdown("#### 题面文件")
+        problem_upload = st.file_uploader("上传赛题文件", type=SUPPORTED_FILES, accept_multiple_files=False, key="dashboard_problem_upload")
+        if "upload_session_id" not in st.session_state:
+            st.session_state["upload_session_id"] = datetime.now().strftime("%Y%m%d_%H%M%S")
+        upload_dir = UPLOAD_ROOT / st.session_state["upload_session_id"]
+        if problem_upload is not None:
+            st.session_state["dashboard_problem_path"] = save_uploaded_file(problem_upload, upload_dir / "problem")
+        problem_path = st.session_state.get("dashboard_problem_path") or config.get("problem_path")
+        if problem_path:
+            render_file_card(Path(problem_path), "Problem statement")
+        else:
+            render_empty_state("等待题面文件", "请上传 PDF、DOCX 或 TXT 赛题文件。", "Required")
+
+        st.markdown("#### 数据文件")
+        data_uploads = st.file_uploader("上传数据文件", type=SUPPORTED_FILES, accept_multiple_files=True, key="dashboard_data_uploads")
+        if data_uploads:
+            data_dir = save_data_uploads(data_uploads, upload_dir / "data")
+            st.session_state["dashboard_data_path"] = data_dir
+            st.session_state["dashboard_data_files"] = [data_dir / sanitize_filename(file.name) for file in data_uploads] if data_dir else []
+        data_path = st.session_state.get("dashboard_data_path") or config.get("data_path")
+        data_files = [Path(path) for path in st.session_state.get("dashboard_data_files", [])]
+        if data_files:
+            for file_path in data_files:
+                render_file_card(file_path, "Data file")
+        elif data_path and Path(data_path).exists():
+            for file_path in sorted(Path(data_path).glob("*")):
+                if file_path.is_file():
+                    render_file_card(file_path, "Data file")
+        else:
+            render_empty_state("暂无数据文件", "可以不上传数据，系统会仅基于题面文本建模。", "Optional")
+    with right:
+        st.markdown("#### Run Parameters")
+        use_rag = st.toggle("RAG Retrieval", value=bool(config.get("use_rag", False)), key="dashboard_use_rag")
+        enable_reflection = st.toggle("Reflection Loop", value=bool(config.get("enable_reflection", True)), key="dashboard_reflection")
+        export_docx = st.toggle("Export Word", value=bool(config.get("export_docx", False)), key="dashboard_export_docx")
+        export_pdf = st.toggle("Export PDF", value=bool(config.get("export_pdf", False)), key="dashboard_export_pdf")
+        max_repairs = st.slider("自动修复次数", min_value=0, max_value=5, value=int(config.get("max_repairs", 3)), key="dashboard_max_repairs")
+        launch = st.button("Launch Agent Run / 启动自动建模", type="primary", use_container_width=True, key="dashboard_launch")
+        if launch:
+            run_config = {
+                **config,
+                "use_rag": use_rag,
+                "enable_reflection": enable_reflection,
+                "export_docx": export_docx,
+                "export_pdf": export_pdf,
+                "problem_path": Path(problem_path) if problem_path else None,
+                "data_path": Path(data_path) if data_path else None,
+                "max_repairs": max_repairs,
+                "run_clicked": True,
+            }
+            run_workflow(run_config)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_progress_steps(state: dict[str, Any]) -> None:
     execution_result = state.get("execution_result") or {}
     parts = ['<div class="step-grid">']
@@ -1225,7 +1651,8 @@ def render_progress_steps(state: dict[str, Any]) -> None:
     st.markdown("".join(parts), unsafe_allow_html=True)
 
 
-def render_dashboard(state: dict[str, Any]) -> None:
+def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    render_new_modeling_run(config)
     render_section_header(
         "Agent Mission Control",
         "运行总览",
@@ -1235,13 +1662,16 @@ def render_dashboard(state: dict[str, Any]) -> None:
         render_empty_state(
             "尚未发现运行结果",
             "请上传赛题文件和数据文件后点击“开始自动求解”。如果已经用命令行跑过，页面会自动读取 outputs/logs/solver_state.json。",
+            "Launch Agent Run",
         )
         st.code("python main.py --problem path/to/problem.pdf --data path/to/data_dir")
-        return
+        render_agent_timeline({})
+        return state
 
     done, total = workflow_completion(state)
     st.progress(done / total if total else 0.0, text=f"工作流完成度：{done}/{total}")
-    render_progress_steps(state)
+    render_agent_timeline(state)
+    render_artifact_overview(state)
 
     parsed_problem = get_section(state, "parsed_problem")
     data_profile = get_section(state, "data_profile", "data_profile.json")
@@ -1299,6 +1729,7 @@ def render_dashboard(state: dict[str, Any]) -> None:
         """,
         unsafe_allow_html=True,
     )
+    return state
 
 
 def render_problem_tab(state: dict[str, Any]) -> None:
@@ -1339,8 +1770,9 @@ def render_problem_tab(state: dict[str, Any]) -> None:
         with st.expander(f"小问 {idx} · {q_type}", expanded=True):
             st.write(text)
 
-    with st.expander("原始解析 JSON"):
-        st.json(parsed)
+    if is_expert_mode():
+        with st.expander("原始解析 JSON"):
+            st.json(parsed)
 
 
 def render_data_profile_tab(state: dict[str, Any]) -> None:
@@ -1358,8 +1790,9 @@ def render_data_profile_tab(state: dict[str, Any]) -> None:
     files = profile.get("files", [])
     if not files:
         render_empty_state("未检测到结构化数据", "系统会继续基于题面文本和默认假设生成建模流程。")
-        with st.expander("数据画像 JSON"):
-            st.json(profile)
+        if is_expert_mode():
+            with st.expander("数据画像 JSON"):
+                st.json(profile)
         return
 
     cols = st.columns(4)
@@ -1402,8 +1835,9 @@ def render_data_profile_tab(state: dict[str, Any]) -> None:
                     else:
                         st.caption(fig.get("caption", "figure"))
 
-    with st.expander("数据画像 JSON"):
-        st.json(profile)
+    if is_expert_mode():
+        with st.expander("数据画像 JSON"):
+            st.json(profile)
 
 
 def candidate_score(candidate: dict[str, Any]) -> int:
@@ -1421,13 +1855,13 @@ def render_candidate_card(candidate: dict[str, Any], selected: bool = False) -> 
     risk_tags = "".join(pill(risk, "warn") for risk in risks[:2])
     st.markdown(
         f"""
-        <div class="{card_class}">
+        <div class="{card_class}" style="{'' if selected else 'opacity:.78;'}">
             <div class="score-chip"><div class="num">{h(score)}</div><div class="txt">score</div></div>
             <div class="card-title">{h(candidate.get('name') or candidate.get('model_id') or 'candidate model')}</div>
             <div>
                 {pill(candidate.get('category', 'model'), 'info')}
                 {pill(candidate.get('implementation_difficulty', 'medium'), 'warn')}
-                {pill('selected', 'ok') if selected else ''}
+                {pill('SELECTED', 'ok') if selected else ''}
             </div>
             <div class="card-text" style="margin-top:8px;">{h(candidate.get('why_suitable', '暂无适配说明。'))}</div>
             <div class="muted-line" style="margin-top:9px;"><strong>Output</strong> · {h(candidate.get('expected_output', '-'))}</div>
@@ -1437,6 +1871,10 @@ def render_candidate_card(candidate: dict[str, Any], selected: bool = False) -> 
         """,
         unsafe_allow_html=True,
     )
+    scores = candidate.get("scores") if isinstance(candidate.get("scores"), dict) else candidate
+    for key in ("data_fit_score", "implementation_score", "interpretability_score", "stability_score", "reportability_score"):
+        if key in scores:
+            render_score_bar(key, scores.get(key))
 
 
 def render_strategy_tab(state: dict[str, Any]) -> None:
@@ -1468,12 +1906,13 @@ def render_strategy_tab(state: dict[str, Any]) -> None:
                 render_candidate_card(candidate, selected=candidate.get("model_id") == selected_id)
 
     refs = strategies.get("retrieved_references", [])
-    if refs:
+    if refs and is_expert_mode():
         with st.expander("RAG 检索参考"):
             st.json(refs)
-    with st.expander("模型推荐 JSON"):
-        st.json(strategies)
-    if selected_model:
+    if is_expert_mode():
+        with st.expander("模型推荐 JSON"):
+            st.json(strategies)
+    if selected_model and is_expert_mode():
         with st.expander("模型选择 JSON"):
             st.json(selected_model)
 
@@ -1513,10 +1952,12 @@ def render_solution_competition_tab(state: dict[str, Any]) -> None:
                 for item in solution.get("models_for_each_task", []):
                     model = item.get("selected_model") or {}
                     st.write(f"{item.get('task_id')}: {model.get('name') or model.get('model_id')}")
-                st.json(solution.get("score", {}))
+                if is_expert_mode():
+                    st.json(solution.get("score", {}))
 
-    with st.expander("方案竞争 JSON"):
-        st.json(competition)
+    if is_expert_mode():
+        with st.expander("方案竞争 JSON"):
+            st.json(competition)
 
 
 def render_formula_figure_tab(state: dict[str, Any]) -> None:
@@ -1560,30 +2001,52 @@ def render_formula_figure_tab(state: dict[str, Any]) -> None:
                 with st.expander(f"{fig.get('figure_id')} · {fig.get('title')}", expanded=False):
                     st.write(fig.get("caption", ""))
                     st.write(f"论文用途：{fig.get('purpose_in_paper', '-')}")
-                    st.json({k: fig.get(k) for k in ("figure_type", "required_data", "x_axis", "y_axis", "grouping", "priority")})
+                    if is_expert_mode():
+                        st.json({k: fig.get(k) for k in ("figure_type", "required_data", "x_axis", "y_axis", "grouping", "priority")})
         else:
             st.caption("暂无图表规划。")
 
-    st.markdown("#### 已生成图表")
+    st.markdown("#### 图表 Gallery")
     if figures:
-        cols = st.columns(2)
-        for idx, figure in enumerate(figures):
-            with cols[idx % 2]:
-                st.image(str(figure), caption=figure.relative_to(figures_dir).as_posix())
+        plan_items = {str(item.get("figure_id", "")).lower(): item for item in figure_plan.get("figure_plan", [])}
+        category = st.radio("图表来源", ["All", "Data Profile", "Model Output", "Sensitivity"], horizontal=True)
+        filtered = []
+        for figure in figures:
+            name = figure.name.lower()
+            if "data_profile" in figure.as_posix().lower():
+                fig_category = "Data Profile"
+            elif "sensitivity" in name:
+                fig_category = "Sensitivity"
+            else:
+                fig_category = "Model Output"
+            if category == "All" or category == fig_category:
+                filtered.append((figure, fig_category))
+        cols = st.columns(3 if len(filtered) >= 3 else 2)
+        for idx, (figure, fig_category) in enumerate(filtered):
+            plan = next((item for key, item in plan_items.items() if key and key in figure.stem.lower()), {})
+            with cols[idx % len(cols)]:
+                st.markdown('<div class="artifact-card">', unsafe_allow_html=True)
+                st.image(str(figure), caption=plan.get("caption") or figure.name)
+                st.markdown(f"**{figure.name}**")
+                st.markdown(f"{pill(fig_category, 'info')}{pill(plan.get('figure_type', figure.suffix.lower()), 'neutral')}", unsafe_allow_html=True)
+                if plan.get("purpose_in_paper"):
+                    st.caption(plan.get("purpose_in_paper"))
                 st.download_button(
-                    f"下载 {figure.name}",
+                    f"下载图表",
                     figure.read_bytes(),
                     file_name=figure.name,
                     key=f"download-figure-{idx}-{figure.name}",
                     use_container_width=True,
                 )
+                st.markdown("</div>", unsafe_allow_html=True)
     else:
         render_empty_state("暂无图片文件", "当代码执行或数据画像生成图表后，会在这里展示缩略图。")
 
-    with st.expander("公式 JSON"):
-        st.json(formulas)
-    with st.expander("图表规划 JSON"):
-        st.json(figure_plan)
+    if is_expert_mode():
+        with st.expander("公式 JSON"):
+            st.json(formulas)
+        with st.expander("图表规划 JSON"):
+            st.json(figure_plan)
 
 
 def render_code_execution_tab(state: dict[str, Any]) -> None:
@@ -1613,6 +2076,24 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
         render_metric_card("Generated Files", len(code_files), "outputs/code", "OUT")
 
     if attempt_list:
+        st.markdown("#### Repair Timeline")
+        timeline_parts = ['<div class="agent-timeline">']
+        for attempt in attempt_list:
+            if isinstance(attempt, dict):
+                ok = bool(attempt.get("success"))
+                css = "completed" if ok else "failed"
+                attempt_no = attempt.get("attempt", "-")
+                repaired = bool(attempt.get("repair"))
+                timeline_parts.append(
+                    f"""
+                    <div class="timeline-card {css}">
+                        <div class="card-title">Attempt {h(attempt_no)}</div>
+                        <div class="muted-line">{h('success' if ok else 'failed')} · {h('repaired' if repaired else 'no repair')}</div>
+                    </div>
+                    """
+                )
+        timeline_parts.append("</div>")
+        st.markdown("".join(timeline_parts), unsafe_allow_html=True)
         for attempt in attempt_list:
             if not isinstance(attempt, dict):
                 continue
@@ -1620,13 +2101,17 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
             label = f"Attempt {attempt.get('attempt', '-')}: {'success' if ok else 'failed'}"
             with st.expander(label, expanded=not ok):
                 repair = attempt.get("repair")
-                if repair:
+                if repair and is_expert_mode():
                     st.write("修复说明")
                     st.json(repair)
-                render_terminal_block("stdout", attempt.get("stdout", "") or "(empty)", "ok" if ok else "neutral")
-                render_terminal_block("stderr", attempt.get("stderr", "") or "(empty)", "danger" if not ok else "neutral")
+                if is_expert_mode():
+                    render_terminal_block("stdout", attempt.get("stdout", "") or "(empty)", "ok" if ok else "neutral")
+                    render_terminal_block("stderr", attempt.get("stderr", "") or "(empty)", "danger" if not ok else "neutral")
+                elif not ok:
+                    stderr = (attempt.get("stderr", "") or "").splitlines()
+                    render_terminal_block("stderr summary", "\n".join(stderr[-8:]) or "(empty)", "danger")
                 generated_files = attempt.get("generated_files", [])
-                if generated_files:
+                if generated_files and is_expert_mode():
                     st.write("生成文件")
                     st.json(generated_files)
 
@@ -1634,7 +2119,8 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
     if code_files:
         for idx, file_path in enumerate(code_files):
             rel = file_path.relative_to(code_dir).as_posix()
-            st.markdown(f'<div class="code-list">{h(rel)}</div>', unsafe_allow_html=True)
+            meta = file_metadata(file_path)
+            st.markdown(f'<div class="code-list">{h(rel)} · {h(format_file_size(meta["size"]))}</div>', unsafe_allow_html=True)
             st.download_button(
                 f"下载 {file_path.name}",
                 file_path.read_bytes(),
@@ -1664,16 +2150,20 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
         ("modeling_depth_score", "建模深度"),
         ("report_quality_score", "报告质量"),
     ]
+    numeric_scores = []
+    for key, _ in score_keys:
+        try:
+            numeric_scores.append(float(reflection.get(key, 0)))
+        except (TypeError, ValueError):
+            pass
+    overall = round(sum(numeric_scores) / len(numeric_scores), 1) if numeric_scores else "-"
+    render_metric_card("总体质量分", overall, "Reflection aggregate", "QA")
     cols = st.columns(len(score_keys))
     for idx, (key, label) in enumerate(score_keys):
         value = reflection.get(key, 0)
         with cols[idx]:
             render_metric_card(label, value, "0-100 或 0-5 评分", f"S{idx + 1}")
-            try:
-                numeric = float(value)
-                st.progress(min(numeric / 100 if numeric > 5 else numeric / 5, 1.0))
-            except (TypeError, ValueError):
-                pass
+            render_score_bar(label, value)
 
     st.markdown(
         pill("需要修订" if reflection.get("need_revision") else "无需修订", "warn" if reflection.get("need_revision") else "ok"),
@@ -1686,23 +2176,24 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
         problems = reflection.get("detected_problems", [])
         if problems:
             for problem in problems:
-                st.markdown(f"- {problem}")
+                st.markdown(f"{pill('Warning', 'danger')} {h(problem)}", unsafe_allow_html=True)
         else:
-            st.caption("未检出明显问题。")
+            st.markdown(f"{pill('PASS', 'ok')} 未检出明显问题。", unsafe_allow_html=True)
     with right:
         st.markdown("#### 修订建议")
         fixes = reflection.get("suggested_fixes", [])
         if fixes:
             for fix in fixes:
-                st.markdown(f"- {fix}")
+                st.markdown(f"{pill('Action', 'info')} {h(fix)}", unsafe_allow_html=True)
         else:
             st.caption("暂无修订建议。")
 
-    if reflection.get("revision_plan"):
+    if reflection.get("revision_plan") and is_expert_mode():
         with st.expander("修订计划"):
             st.json(reflection.get("revision_plan"))
-    with st.expander("反思 JSON"):
-        st.json(reflection)
+    if is_expert_mode():
+        with st.expander("反思 JSON"):
+            st.json(reflection)
 
 
 def render_report_tab(state: dict[str, Any]) -> None:
@@ -1717,16 +2208,33 @@ def render_report_tab(state: dict[str, Any]) -> None:
         render_empty_state("暂无 Markdown 报告", "运行完整工作流后会生成 outputs/reports/solution_report.md。")
         return
 
-    cols = st.columns(3)
-    with cols[0]:
+    markdown = read_text(report_path)
+    headings = markdown_headings(markdown)
+    meta = file_metadata(report_path)
+    left, right = st.columns([0.28, 0.72])
+    with left:
+        st.markdown('<div class="artifact-card">', unsafe_allow_html=True)
+        st.markdown("#### 报告目录")
+        if headings:
+            for level, title in headings:
+                indent = "&nbsp;" * ((level - 1) * 3)
+                st.markdown(f"{indent}- {h(title)}", unsafe_allow_html=True)
+        else:
+            st.caption("未识别到 Markdown 标题。")
+        st.markdown(f"{pill('Generated', 'ok')}{pill(format_file_size(meta['size']), 'info')}", unsafe_allow_html=True)
+        st.caption(f"生成时间：{meta['modified']}")
         render_download_button("下载 Markdown", report_path, "solution_report.md")
-    with cols[1]:
         render_download_button("下载 Word", docx_path, "solution_report.docx")
-    with cols[2]:
         render_download_button("下载 PDF", pdf_path, "solution_report.pdf")
-
-    with st.expander("报告预览", expanded=True):
-        st.markdown(read_text(report_path))
+        st.markdown("</div>", unsafe_allow_html=True)
+    with right:
+        show_full = is_expert_mode() or st.toggle("展开完整报告", value=False)
+        preview = markdown if show_full else markdown[:9000]
+        st.markdown('<div class="report-reader">', unsafe_allow_html=True)
+        st.markdown(preview)
+        if not show_full and len(markdown) > len(preview):
+            st.caption("普通模式仅展示报告前半部分。打开 Expert Mode 或切换“展开完整报告”可查看全文。")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_logs_tab(state: dict[str, Any]) -> None:
@@ -1778,6 +2286,8 @@ def render_logs_tab(state: dict[str, Any]) -> None:
         elif selected_path.suffix == ".jsonl":
             text = read_text(selected_path, 60000)
             lines = [line for line in text.splitlines() if line.strip()]
+            if not is_expert_mode():
+                lines = lines[-5:]
             preview = []
             for line in lines[-20:]:
                 try:
@@ -1815,7 +2325,7 @@ def main() -> None:
         ]
     )
     with tabs[0]:
-        render_dashboard(state)
+        state = render_dashboard(state, config)
     with tabs[1]:
         render_problem_tab(state)
     with tabs[2]:
