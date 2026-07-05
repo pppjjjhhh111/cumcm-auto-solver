@@ -3,12 +3,12 @@ from pathlib import Path
 from src.tools.file_loader import FileLoader
 
 
-def test_file_loader_reads_sample_txt_and_csv() -> None:
+def test_file_loader_reads_minimal_txt_and_csv() -> None:
     root = Path(__file__).resolve().parents[1]
     loader = FileLoader()
 
-    problem = loader.load_problem(root / "examples" / "sample_problem" / "problem.txt")
-    data = loader.load_data(root / "examples" / "sample_problem" / "data")
+    problem = loader.load_problem(root / "tests" / "fixtures" / "minimal_problem" / "problem.txt")
+    data = loader.load_data(root / "tests" / "fixtures" / "minimal_problem" / "data")
 
     assert "共享单车" in problem["content"]
     assert len(data) == 1
@@ -19,4 +19,3 @@ def test_file_loader_reads_sample_txt_and_csv() -> None:
         "bikes_available",
         "orders",
     ]
-

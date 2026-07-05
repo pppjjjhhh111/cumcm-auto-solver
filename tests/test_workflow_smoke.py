@@ -5,7 +5,7 @@ from src.core.llm_client import MockLLMClient
 from src.core.workflow import WorkflowRunner
 
 
-def test_sample_workflow_runs() -> None:
+def test_minimal_workflow_runs() -> None:
     root = Path(__file__).resolve().parents[1]
     output_dir = root / "outputs" / "test_runs" / f"workflow_smoke_{uuid4().hex}"
     runner = WorkflowRunner(
@@ -16,8 +16,8 @@ def test_sample_workflow_runs() -> None:
     )
 
     state = runner.run(
-        root / "examples" / "sample_problem" / "problem.txt",
-        root / "examples" / "sample_problem" / "data",
+        root / "tests" / "fixtures" / "minimal_problem" / "problem.txt",
+        root / "tests" / "fixtures" / "minimal_problem" / "data",
     )
 
     assert state.execution_result["success"] is True

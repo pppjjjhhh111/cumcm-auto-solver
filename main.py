@@ -4,15 +4,10 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Any
 
 from src.core.llm_client import (
     DeepSeekLLMClient,
     LLMClient,
-    LocalHTTPLLMClient,
-    MockLLMClient,
-    OpenAICompatibleLLMClient,
-    RealLLMClient,
 )
 from src.core.workflow import WorkflowRunner
 from src.evaluation.batch_runner import BatchRunner
@@ -25,13 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data", default=None, help="Path to a data file or data directory.")
     parser.add_argument("--output-dir", default="outputs", help="Directory for logs, code, figures, and reports.")
     parser.add_argument("--max-repairs", type=int, default=3, help="Maximum automatic code repair attempts.")
-    parser.add_argument(
-        "--llm",
-        choices=["auto", "mock", "deepseek", "real", "openai-compatible", "local-http", "config"],
-        default="auto",
-        help="LLM backend. auto uses DeepSeek when DEEPSEEK_API_KEY is set, otherwise mock.",
-    )
-    parser.add_argument("--llm-config", default="config/model_config.yaml", help="LLM provider config yaml.")
+    parser.add_argument("--llm", default="deepseek", help=argparse.SUPPRESS)
+    parser.add_argument("--llm-config", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--deepseek-model", default=None, help="DeepSeek model name.")
     parser.add_argument("--deepseek-base-url", default=None, help="DeepSeek OpenAI-compatible base URL.")
     parser.add_argument("--llm-strict", action="store_true", help="Fail workflow if a real LLM call fails.")
@@ -46,74 +36,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_llm_client(args: argparse.Namespace, project_root: Path) -> LLMClient:
-    if args.llm == "auto":
-        if os.environ.get("DEEPSEEK_API_KEY"):
-            return DeepSeekLLMClient(
-                model=args.deepseek_model,
-                base_url=args.deepseek_base_url,
-                strict=args.llm_strict,
-            )
-        return MockLLMClient()
-    if args.llm == "mock":
-        return MockLLMClient()
-    if args.llm == "deepseek":
-        return DeepSeekLLMClient(
-            model=args.deepseek_model,
-            base_url=args.deepseek_base_url,
-            strict=args.llm_strict,
-        )
-    if args.llm == "real":
-        return RealLLMClient()
-    config = load_llm_config(project_root / args.llm_config)
-    provider = config.get("provider", "mock") if args.llm == "config" else args.llm.replace("-", "_")
-    if provider in {"mock", ""}:
-        return MockLLMClient()
-    if provider == "deepseek":
-        cfg = config.get("deepseek", {})
-        return DeepSeekLLMClient(
-            model=args.deepseek_model or cfg.get("model"),
-            base_url=args.deepseek_base_url or cfg.get("base_url"),
-            max_tokens=int(cfg.get("max_tokens", 4096)),
-            temperature=float(cfg.get("temperature", 0.2)),
-            timeout_seconds=int(cfg.get("timeout_seconds", 60)),
-            strict=args.llm_strict,
-        )
-    if provider == "openai_compatible":
-        cfg = config.get("openai_compatible", {})
-        return OpenAICompatibleLLMClient(
-            base_url=cfg.get("base_url", ""),
-            api_key_env=cfg.get("api_key_env", "OPENAI_API_KEY"),
-            model=cfg.get("model", ""),
-            temperature=float(cfg.get("temperature", 0.2)),
-            max_tokens=int(cfg.get("max_tokens", 4096)),
-            timeout_seconds=int(cfg.get("timeout_seconds", 60)),
-            strict=args.llm_strict,
-        )
-    if provider == "local_http":
-        cfg = config.get("local_http", {})
-        return LocalHTTPLLMClient(
-            base_url=cfg.get("base_url", "http://localhost:8000/v1"),
-            api_key_env=cfg.get("api_key_env", "LOCAL_LLM_API_KEY"),
-            model=cfg.get("model", ""),
-            temperature=float(cfg.get("temperature", 0.2)),
-            max_tokens=int(cfg.get("max_tokens", 4096)),
-            timeout_seconds=int(cfg.get("timeout_seconds", 60)),
-            strict=args.llm_strict,
-        )
-    raise ValueError(f"Unsupported provider in config: {provider}")
-
-
-def load_llm_config(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {"provider": "mock"}
-    text = path.read_text(encoding="utf-8")
-    if path.suffix.lower() in {".yaml", ".yml"}:
-        import yaml
-
-        return yaml.safe_load(text) or {}
-    import json
-
-    return json.loads(text)
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        raise RuntimeError("DEEPSEEK_API_KEY is required. Please set it before running the solver.")
+    return DeepSeekLLMClient(
+        model=args.deepseek_model,
+        base_url=args.deepseek_base_url,
+        strict=args.llm_strict,
+    )
 
 
 def build_kb(project_root: Path, kb_dir: Path) -> int:
@@ -169,7 +98,7 @@ def main() -> int:
         return 2
 
     print("Workflow finished.")
-    print(f"LLM backend: {args.llm}")
+    print("LLM backend: deepseek")
     print(f"Report: {state.paper.get('report_path')}")
     print(f"Code dir: {state.code_dir}")
     print(f"Figures dir: {state.figures_dir}")

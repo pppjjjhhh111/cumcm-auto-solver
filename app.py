@@ -14,16 +14,11 @@ import streamlit as st
 
 from src.core.llm_client import (
     DeepSeekLLMClient,
-    LocalHTTPLLMClient,
-    MockLLMClient,
-    OpenAICompatibleLLMClient,
 )
 from src.core.workflow import WorkflowRunner
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_PROBLEM = PROJECT_ROOT / "examples" / "sample_problem" / "problem.txt"
-DEFAULT_DATA = PROJECT_ROOT / "examples" / "sample_problem" / "data"
 UPLOAD_ROOT = PROJECT_ROOT / "outputs" / "uploads"
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 LOGS_DIR = OUTPUT_DIR / "logs"
@@ -713,25 +708,10 @@ def save_data_uploads(uploaded_files: Iterable[Any], target_dir: Path) -> Path |
     return target_dir
 
 
-def make_llm_client(provider: str):
-    if provider == "mock":
-        return MockLLMClient(), "mock"
-    if provider == "deepseek":
-        return DeepSeekLLMClient(), "deepseek"
-    if provider == "openai-compatible":
-        return OpenAICompatibleLLMClient(
-            base_url=os.environ.get("OPENAI_BASE_URL", ""),
-            api_key_env="OPENAI_API_KEY",
-            model=os.environ.get("OPENAI_MODEL", ""),
-        ), "openai-compatible"
-    if provider == "local-http":
-        return LocalHTTPLLMClient(
-            base_url=os.environ.get("LOCAL_LLM_BASE_URL", "http://localhost:8000/v1"),
-            model=os.environ.get("LOCAL_LLM_MODEL", ""),
-        ), "local-http"
-    if os.environ.get("DEEPSEEK_API_KEY"):
-        return DeepSeekLLMClient(), "deepseek"
-    return MockLLMClient(), "mock"
+def make_llm_client():
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        raise RuntimeError("未检测到 DEEPSEEK_API_KEY。请先在环境变量中配置 DeepSeek API Key。")
+    return DeepSeekLLMClient(), "deepseek"
 
 
 def read_text(path: Path, limit: int | None = None) -> str:
@@ -960,8 +940,8 @@ def render_hero(provider: str, use_rag: bool, enable_reflection: bool) -> None:
                 <div class="status-row">
                     <div class="status-card">
                         <div class="status-label">LLM Provider</div>
-                        <div class="status-value">{h(provider)}</div>
-                        {render_status_badge("Mock" if provider == "mock" else "Active", "info")}
+                        <div class="status-value">DeepSeek</div>
+                        {render_status_badge("Active", "info")}
                     </div>
                     <div class="status-card">
                         <div class="status-label">RAG</div>
@@ -999,11 +979,15 @@ def render_sidebar() -> dict[str, Any]:
         )
 
         sidebar_section("01 / Runtime")
-        provider = st.selectbox(
-            "LLM Provider",
-            ["auto", "mock", "deepseek", "openai-compatible", "local-http"],
-            index=0,
-            help="真实 API key 只从环境变量读取；未配置时建议使用 mock。",
+        st.markdown(
+            """
+            <div class="soft-card">
+                <div class="eyebrow">LLM Provider</div>
+                <div style="font-size:20px;font-weight:800;color:#e0f2fe;margin-top:4px;">DeepSeek</div>
+                <div style="color:#94a3b8;font-size:12px;margin-top:6px;">API Key is read from DEEPSEEK_API_KEY.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
         use_rag = st.toggle("RAG Retrieval", value=False)
         enable_reflection = st.toggle("Reflection Loop", value=True)
@@ -1011,7 +995,6 @@ def render_sidebar() -> dict[str, Any]:
         export_pdf = st.toggle("Export PDF", value=False)
 
         sidebar_section("02 / Inputs")
-        input_mode = st.radio("题目来源", ["示例题", "本地路径", "上传文件"], index=0)
         problem_path: Path | None = None
         data_path: Path | None = None
 
@@ -1019,34 +1002,25 @@ def render_sidebar() -> dict[str, Any]:
             st.session_state["upload_session_id"] = datetime.now().strftime("%Y%m%d_%H%M%S")
         upload_dir = UPLOAD_ROOT / st.session_state["upload_session_id"]
 
-        if input_mode == "示例题":
-            problem_path = DEFAULT_PROBLEM
-            data_path = DEFAULT_DATA
-            st.caption(DEFAULT_PROBLEM.relative_to(PROJECT_ROOT).as_posix())
-            st.caption(DEFAULT_DATA.relative_to(PROJECT_ROOT).as_posix())
-        elif input_mode == "本地路径":
-            problem_text = st.text_input("题面文件", "examples/sample_problem/problem.txt")
-            data_text = st.text_input("数据文件或目录", "examples/sample_problem/data")
-            problem_path = resolve_project_path(problem_text) if problem_text.strip() else None
-            data_path = resolve_project_path(data_text) if data_text.strip() else None
+        problem_upload = st.file_uploader(
+            "上传赛题文件",
+            type=SUPPORTED_FILES,
+            accept_multiple_files=False,
+        )
+        data_uploads = st.file_uploader(
+            "上传数据文件",
+            type=SUPPORTED_FILES,
+            accept_multiple_files=True,
+        )
+        if problem_upload is not None:
+            problem_path = save_uploaded_file(problem_upload, upload_dir / "problem")
+            st.caption(f"题面：{problem_upload.name}")
+        if data_uploads:
+            data_path = save_data_uploads(data_uploads, upload_dir / "data")
+            for uploaded in data_uploads:
+                st.caption(f"数据：{uploaded.name}")
         else:
-            problem_upload = st.file_uploader(
-                "上传赛题文件",
-                type=SUPPORTED_FILES,
-                accept_multiple_files=False,
-            )
-            data_uploads = st.file_uploader(
-                "上传数据文件",
-                type=SUPPORTED_FILES,
-                accept_multiple_files=True,
-            )
-            if problem_upload is not None:
-                problem_path = save_uploaded_file(problem_upload, upload_dir / "problem")
-                st.caption(f"题面：{problem_upload.name}")
-            if data_uploads:
-                data_path = save_data_uploads(data_uploads, upload_dir / "data")
-                for uploaded in data_uploads:
-                    st.caption(f"数据：{uploaded.name}")
+            st.caption("未上传数据文件时，系统将仅基于题面文本进行建模。")
 
         sidebar_section("03 / Execution")
         max_repairs = st.slider("自动修复次数", min_value=0, max_value=5, value=3)
@@ -1077,12 +1051,11 @@ def render_sidebar() -> dict[str, Any]:
             st.download_button("下载日志 zip", make_zip([LOGS_DIR]), file_name="logs.zip", use_container_width=True)
 
     return {
-        "provider": provider,
+        "provider": "deepseek",
         "use_rag": use_rag,
         "enable_reflection": enable_reflection,
         "export_docx": export_docx,
         "export_pdf": export_pdf,
-        "input_mode": input_mode,
         "problem_path": problem_path,
         "data_path": data_path,
         "max_repairs": max_repairs,
@@ -1094,17 +1067,21 @@ def run_workflow(config: dict[str, Any]) -> None:
     problem_path = config["problem_path"]
     data_path = config["data_path"]
     if problem_path is None or not problem_path.exists():
-        st.error("题面文件不存在，请检查输入。")
+        st.error("请先上传赛题文件。")
         st.stop()
+    if data_path is None:
+        st.warning("未上传数据文件，系统将仅基于题面文本进行建模。")
     if data_path is not None and not data_path.exists():
         st.error("数据路径不存在，请检查输入。")
         st.stop()
 
     try:
-        llm_client, effective_provider = make_llm_client(config["provider"])
+        llm_client, effective_provider = make_llm_client()
     except Exception as exc:  # noqa: BLE001
-        st.error(f"LLM 初始化失败：{type(exc).__name__}: {exc}")
-        st.info("可以先选择 mock，或在系统环境变量中配置对应 API key。")
+        st.error(f"未检测到 DEEPSEEK_API_KEY，请先配置 DeepSeek API Key。")
+        st.code('export DEEPSEEK_API_KEY="你的key"', language="bash")
+        st.code('$env:DEEPSEEK_API_KEY="你的key"', language="powershell")
+        st.caption(f"详细错误：{type(exc).__name__}: {exc}")
         st.stop()
 
     progress = st.progress(0)
@@ -1202,9 +1179,9 @@ def render_dashboard(state: dict[str, Any]) -> None:
     if not state:
         render_empty_state(
             "尚未发现运行结果",
-            "选择题目和数据后点击“开始自动求解”。如果已经用命令行跑过，页面会自动读取 outputs/logs/solver_state.json。",
+            "请上传赛题文件和数据文件后点击“开始自动求解”。如果已经用命令行跑过，页面会自动读取 outputs/logs/solver_state.json。",
         )
-        st.code("python main.py --problem examples/sample_problem/problem.txt --data examples/sample_problem/data")
+        st.code("python main.py --problem path/to/problem.pdf --data path/to/data_dir")
         return
 
     done, total = workflow_completion(state)

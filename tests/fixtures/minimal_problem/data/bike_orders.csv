@@ -13,4 +13,3 @@ date,temperature_c,is_weekend,bikes_available,orders
 2025-05-12,24,0,360,1505
 2025-05-13,22,0,350,1400
 2025-05-14,25,0,375,1620
-

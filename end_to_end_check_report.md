@@ -8,7 +8,7 @@ Scope: sample problem workflow acceptance only. No new features were added.
 
 ```powershell
 python -m compileall main.py app.py src
-python main.py --problem examples/sample_problem/problem.txt --data examples/sample_problem/data
+python main.py --problem path/to/problem.pdf --data path/to/data_dir
 python -m pytest
 ```
 
@@ -101,4 +101,4 @@ No code fixes were required during this acceptance run.
 
 ## Conclusion
 
-The current `cumcm-auto-solver` sample workflow is end-to-end runnable. It can generate the Markdown report, generated Python code, analysis outputs, SVG figures, and structured logs from `examples/sample_problem`.
+The current `cumcm-auto-solver` workflow is end-to-end runnable with a valid uploaded or local problem file and optional data directory. It can generate the Markdown report, generated Python code, analysis outputs, SVG figures, and structured logs.

@@ -11,8 +11,8 @@ Development principles:
 4. Save all intermediate artifacts.
 5. Never execute generated code outside the project workspace.
 6. Never delete user files.
-7. Use deterministic fallback logic when LLM output is unavailable.
-8. The MVP should run without external API keys using MockLLMClient.
+7. Use clear error handling when required LLM configuration is unavailable.
+8. Keep MockLLMClient available for unit tests and low-level compatibility only.
 9. Real LLM integration should be implemented behind LLMClient.
 10. Prioritize end-to-end runnable workflow over model sophistication.
 
@@ -36,7 +36,7 @@ Maintenance rules for every future change:
 Main command:
 
 ```bash
-python main.py --problem examples/sample_problem/problem.txt --data examples/sample_problem/data
+python main.py --problem path/to/problem.pdf --data path/to/data_dir
 ```
 
 Expected output:
