@@ -26,6 +26,8 @@ CODE_DIR = OUTPUT_DIR / "code"
 FIGURES_DIR = OUTPUT_DIR / "figures"
 REPORTS_DIR = OUTPUT_DIR / "reports"
 SUPPORTED_FILES = ["pdf", "docx", "txt", "csv", "xlsx"]
+LEGACY_SAMPLE_MARKERS = ("sample" + "_problem", "examples/" + "sample" + "_problem")
+TEXT_ARTIFACT_SUFFIXES = {".json", ".jsonl", ".md", ".py", ".txt", ".csv", ".yaml", ".yml", ".svg"}
 
 WORKFLOW_STEPS = [
     ("文件读取", "file_loader", "Input"),
@@ -732,26 +734,55 @@ def load_json(path: Path, default: Any | None = None) -> Any:
         return fallback
 
 
+def contains_legacy_sample_reference(value: Any) -> bool:
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str)
+    except TypeError:
+        text = str(value)
+    normalized = text.replace("\\", "/").lower()
+    return any(marker in normalized for marker in LEGACY_SAMPLE_MARKERS)
+
+
+def is_legacy_sample_artifact(path: Path) -> bool:
+    if contains_legacy_sample_reference(str(path)):
+        return True
+    if not path.exists() or not path.is_file():
+        return False
+    if path.suffix.lower() not in TEXT_ARTIFACT_SUFFIXES:
+        return False
+    return contains_legacy_sample_reference(read_text(path, 300000))
+
+
+def visible_artifact_files(paths: Iterable[Path]) -> list[Path]:
+    return [path for path in paths if not is_legacy_sample_artifact(path)]
+
+
+def report_artifacts_visible() -> bool:
+    return (REPORTS_DIR / "solution_report.md").exists() and not is_legacy_sample_artifact(REPORTS_DIR / "solution_report.md")
+
+
 def make_zip(paths: list[Path]) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in paths:
             if not path.exists():
                 continue
-            if path.is_file():
+            if path.is_file() and not is_legacy_sample_artifact(path):
                 archive.write(path, path.relative_to(PROJECT_ROOT))
             elif path.is_dir():
                 for file_path in path.rglob("*"):
-                    if file_path.is_file():
+                    if file_path.is_file() and not is_legacy_sample_artifact(file_path):
                         archive.write(file_path, file_path.relative_to(PROJECT_ROOT))
     return buffer.getvalue()
 
 
 def latest_log(pattern: str) -> dict[str, Any]:
-    matches = sorted(LOGS_DIR.glob(pattern))
+    matches = visible_artifact_files(sorted(LOGS_DIR.glob(pattern)))
     if not matches:
         return {}
     data = load_json(matches[-1], {})
+    if contains_legacy_sample_reference(data):
+        return {}
     return data if isinstance(data, dict) else {}
 
 
@@ -768,8 +799,17 @@ def state_to_dict(state: Any) -> dict[str, Any]:
 def get_runtime_state() -> dict[str, Any]:
     state = state_to_dict(st.session_state.get("last_state"))
     if state:
+        if contains_legacy_sample_reference(state):
+            st.session_state.pop("last_state", None)
+            st.session_state.pop("effective_provider", None)
+            return {}
         return state
+    state_path = LOGS_DIR / "solver_state.json"
+    if is_legacy_sample_artifact(state_path):
+        return {}
     disk_state = load_json(LOGS_DIR / "solver_state.json", {})
+    if contains_legacy_sample_reference(disk_state):
+        return {}
     return disk_state if isinstance(disk_state, dict) else {}
 
 
@@ -781,8 +821,13 @@ def get_output_path(state: dict[str, Any], key: str, fallback: Path) -> Path:
 def get_section(state: dict[str, Any], state_key: str, fallback_log: str | None = None) -> Any:
     value = state.get(state_key)
     if value not in (None, {}, []):
+        if contains_legacy_sample_reference(value):
+            return {}
         return value
     if fallback_log:
+        fallback_path = LOGS_DIR / fallback_log
+        if is_legacy_sample_artifact(fallback_path):
+            return {}
         return load_json(LOGS_DIR / fallback_log, {})
     return {}
 
@@ -904,7 +949,7 @@ def render_agent_pipeline() -> str:
 
 
 def render_download_button(label: str, path: Path, file_name: str | None = None) -> None:
-    if path.exists() and path.is_file():
+    if path.exists() and path.is_file() and not is_legacy_sample_artifact(path):
         st.download_button(
             label,
             data=path.read_bytes(),
@@ -918,7 +963,7 @@ def sidebar_section(label: str) -> None:
 
 
 def render_hero(provider: str, use_rag: bool, enable_reflection: bool) -> None:
-    report_ready = (REPORTS_DIR / "solution_report.md").exists()
+    report_ready = report_artifacts_visible()
     report_tone = "ok" if report_ready else "warn"
     st.markdown(
         f"""
@@ -1027,7 +1072,7 @@ def render_sidebar() -> dict[str, Any]:
         run_clicked = st.button("开始自动求解", type="primary", use_container_width=True)
 
         state = get_runtime_state()
-        report_exists = (REPORTS_DIR / "solution_report.md").exists()
+        report_exists = report_artifacts_visible()
         run_status = "已有报告" if report_exists else "等待运行"
         if state.get("execution_result"):
             success = bool(state.get("execution_result", {}).get("success"))
@@ -1041,11 +1086,12 @@ def render_sidebar() -> dict[str, Any]:
 
         sidebar_section("04 / Artifacts")
         render_download_button("下载 Markdown 报告", REPORTS_DIR / "solution_report.md", "solution_report.md")
-        render_download_button("下载 Word 报告", REPORTS_DIR / "solution_report.docx", "solution_report.docx")
-        render_download_button("下载 PDF 报告", REPORTS_DIR / "solution_report.pdf", "solution_report.pdf")
-        if CODE_DIR.exists():
+        if report_exists:
+            render_download_button("下载 Word 报告", REPORTS_DIR / "solution_report.docx", "solution_report.docx")
+            render_download_button("下载 PDF 报告", REPORTS_DIR / "solution_report.pdf", "solution_report.pdf")
+        if CODE_DIR.exists() and state:
             st.download_button("下载代码 zip", make_zip([CODE_DIR]), file_name="code.zip", use_container_width=True)
-        if FIGURES_DIR.exists():
+        if FIGURES_DIR.exists() and state:
             st.download_button("下载图表 zip", make_zip([FIGURES_DIR]), file_name="figures.zip", use_container_width=True)
         if LOGS_DIR.exists():
             st.download_button("下载日志 zip", make_zip([LOGS_DIR]), file_name="logs.zip", use_container_width=True)
@@ -1136,11 +1182,11 @@ def count_candidates(strategies: dict[str, Any]) -> int:
 def list_figures(figures_dir: Path) -> list[Path]:
     if not figures_dir.exists():
         return []
-    return sorted(
+    return visible_artifact_files(sorted(
         path
         for path in figures_dir.rglob("*")
         if path.is_file() and path.suffix.lower() in {".svg", ".png", ".jpg", ".jpeg"}
-    )
+    ))
 
 
 def render_progress_steps(state: dict[str, Any]) -> None:
@@ -1193,7 +1239,7 @@ def render_dashboard(state: dict[str, Any]) -> None:
     strategies = get_section(state, "candidate_strategies", "model_recommendations.json")
     execution_result = get_section(state, "execution_result")
     report_path = REPORTS_DIR / "solution_report.md"
-    figures = list_figures(get_output_path(state, "figures_dir", FIGURES_DIR))
+    figures = list_figures(get_output_path(state, "figures_dir", FIGURES_DIR)) if state else []
 
     cols = st.columns(6)
     with cols[0]:
@@ -1207,7 +1253,7 @@ def render_dashboard(state: dict[str, Any]) -> None:
     with cols[4]:
         render_metric_card("代码执行", "成功" if execution_result.get("success") else "未成功", "最近一次执行", "EXE")
     with cols[5]:
-        render_metric_card("报告", "已生成" if report_path.exists() else "未生成", "Markdown", "DOC")
+        render_metric_card("报告", "已生成" if report_artifacts_visible() else "未生成", "Markdown", "DOC")
 
     problem_name = Path(state.get("problem_path", "")).name if state.get("problem_path") else "未知题面"
     problem_type = parsed_problem.get("problem_type", "unknown")
@@ -1215,6 +1261,7 @@ def render_dashboard(state: dict[str, Any]) -> None:
     selected_solution = selected_model.get("selected_solution", {})
     route = selected_solution.get("solution_name") or selected_model.get("overall_route", "尚未选择")
     data_used = data_profile.get("table_count", 0) > 0
+    report_ready = report_artifacts_visible()
 
     st.markdown(
         f"""
@@ -1236,7 +1283,7 @@ def render_dashboard(state: dict[str, Any]) -> None:
                 </div>
                 <div class="mission-item">
                     <div class="mission-label">Data / Report</div>
-                    <div class="mission-value">{h('数据可用' if data_used else '无结构化数据')} · {h('报告已生成' if report_path.exists() else '报告待生成')}</div>
+                    <div class="mission-value">{h('数据可用' if data_used else '无结构化数据')} · {h('报告已生成' if report_ready else '报告待生成')}</div>
                 </div>
             </div>
         </div>
@@ -1459,7 +1506,7 @@ def render_formula_figure_tab(state: dict[str, Any]) -> None:
     formulas = get_section(state, "formulas", "formulas.json")
     figure_plan = get_section(state, "figure_plan", "figure_plan.json")
     figures_dir = get_output_path(state, "figures_dir", FIGURES_DIR)
-    figures = list_figures(figures_dir)
+    figures = list_figures(figures_dir) if state else []
 
     render_section_header("Formula And Figure Lab", "公式与图表", "符号说明、模型公式、图表规划和生成图像。")
     if not formulas and not figure_plan and not figures:
@@ -1524,7 +1571,7 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
     attempts = get_section(state, "execution_attempts", "execution_attempts.json")
     execution_result = get_section(state, "execution_result")
     code_dir = get_output_path(state, "code_dir", CODE_DIR)
-    code_files = sorted(path for path in code_dir.rglob("*") if path.is_file()) if code_dir.exists() else []
+    code_files = visible_artifact_files(sorted(path for path in code_dir.rglob("*") if path.is_file())) if code_dir.exists() and state else []
 
     render_section_header("Execution Console", "代码执行", "查看执行状态、修复尝试、stdout / stderr 和生成文件。")
     if not attempts and not execution_result and not code_files:
@@ -1641,7 +1688,7 @@ def render_report_tab(state: dict[str, Any]) -> None:
     pdf_path = REPORTS_DIR / "solution_report.pdf"
 
     render_section_header("Paper Output", "论文报告", "Markdown 报告预览和导出入口。")
-    if not report_path.exists():
+    if not report_artifacts_visible():
         render_empty_state("暂无 Markdown 报告", "运行完整工作流后会生成 outputs/reports/solution_report.md。")
         return
 
@@ -1663,9 +1710,9 @@ def render_logs_tab(_: dict[str, Any]) -> None:
         render_empty_state("暂无日志目录", "运行后日志会保存在 outputs/logs。")
         return
 
-    log_files = sorted(path for path in LOGS_DIR.glob("*") if path.is_file())
+    log_files = visible_artifact_files(sorted(path for path in LOGS_DIR.glob("*") if path.is_file()))
     if not log_files:
-        render_empty_state("暂无日志文件", "运行后会展示 JSON、JSONL 等日志文件。")
+        render_empty_state("暂无可展示日志文件", "历史运行日志已从 UI 中隐藏。上传赛题并运行后会展示新的 JSON、JSONL 日志文件。")
         return
 
     col1, col2 = st.columns([0.38, 0.62])
