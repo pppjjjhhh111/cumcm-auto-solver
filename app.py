@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import base64
 import html
 import io
 import json
@@ -29,6 +30,7 @@ LEGACY_SAMPLE_MARKERS = (
     "examples/" + "sample" + "_problem",
     "examples\\" + "sample" + "_problem",
 )
+RUN_STARTED_KEY = "current_run_started_at"
 
 WORKFLOW_STEPS = [
     ("文件读取", "file_loader", "Input"),
@@ -484,14 +486,35 @@ def state_to_dict(state: Any) -> dict[str, Any]:
     return {}
 
 
+def get_current_run_started_at() -> float | None:
+    value = st.session_state.get(RUN_STARTED_KEY)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def is_current_session_file(path: Path) -> bool:
+    started_at = get_current_run_started_at()
+    if started_at is None or not path.exists() or not path.is_file():
+        return False
+    try:
+        return path.stat().st_mtime >= started_at - 2
+    except OSError:
+        return False
+
+
+def current_artifact_files(paths: Iterable[Path]) -> list[Path]:
+    return [path for path in visible_artifact_files(paths) if is_current_session_file(path)]
+
+
 def get_runtime_state() -> dict[str, Any]:
     state = state_to_dict(st.session_state.get("last_state"))
     if state:
         return state
-    disk_state = load_json(LOGS_DIR / "solver_state.json", {})
-    if contains_legacy_sample_reference(disk_state):
-        return {}
-    return disk_state if isinstance(disk_state, dict) else {}
+    return {}
 
 
 def get_output_path(state: dict[str, Any], key: str, fallback: Path) -> Path:
@@ -505,7 +528,7 @@ def get_section(state: dict[str, Any], state_key: str, fallback_log: str | None 
         return value
     if fallback_log and state and not contains_legacy_sample_reference(state):
         fallback = LOGS_DIR / fallback_log
-        if not is_legacy_sample_artifact(fallback):
+        if is_current_session_file(fallback) and not is_legacy_sample_artifact(fallback):
             return load_json(fallback, {})
     return {}
 
@@ -587,6 +610,28 @@ def list_files(root: Path, suffixes: set[str] | None = None) -> list[Path]:
 
 def list_figures(root: Path) -> list[Path]:
     return list_files(root, {".png", ".jpg", ".jpeg", ".svg"})
+
+
+def list_current_files(root: Path, suffixes: set[str] | None = None) -> list[Path]:
+    return current_artifact_files(list_files(root, suffixes))
+
+
+def list_current_figures(root: Path) -> list[Path]:
+    return list_current_files(root, {".png", ".jpg", ".jpeg", ".svg"})
+
+
+def render_image_file(path: Path, caption: str | None = None) -> None:
+    if path.suffix.lower() == ".svg":
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        alt = html.escape(caption or path.name)
+        st.markdown(
+            f'<img src="data:image/svg+xml;base64,{encoded}" alt="{alt}" style="width:100%;height:auto;border-radius:12px;" />',
+            unsafe_allow_html=True,
+        )
+        if caption:
+            st.caption(caption)
+        return
+    st.image(path.read_bytes(), caption=caption)
 
 
 def markdown_headings(markdown: str) -> list[tuple[int, str]]:
@@ -775,7 +820,7 @@ def terminal_block(title: str, content: str, tone: str = "neutral", meta: str = 
 
 
 def hero(provider: str, use_rag: bool, enable_reflection: bool) -> None:
-    report_status = "Ready" if (REPORTS_DIR / "solution_report.md").exists() else "Pending"
+    report_status = "Ready" if is_current_session_file(REPORTS_DIR / "solution_report.md") else "Pending"
     nodes = ["Parse", "Model", "Code", "Execute", "Reflect", "Report"]
     pipeline = ['<div class="pipeline">']
     for i, node in enumerate(nodes):
@@ -858,7 +903,7 @@ def agent_timeline(state: dict[str, Any], running: bool = False) -> None:
 # Sidebar and workflow
 # ---------------------------------------------------------------------
 def render_download_button(label: str, path: Path, file_name: str | None = None) -> None:
-    if path.exists() and path.is_file():
+    if is_current_session_file(path):
         st.download_button(label, data=path.read_bytes(), file_name=file_name or path.name, use_container_width=True)
 
 
@@ -913,15 +958,21 @@ def render_sidebar() -> dict[str, Any]:
             st.caption("请先上传赛题文件。")
 
         st.markdown('<div class="sidebar-section">04 · Artifacts</div>', unsafe_allow_html=True)
-        render_download_button("下载 Markdown 报告", REPORTS_DIR / "solution_report.md", "solution_report.md")
-        render_download_button("下载 Word 报告", REPORTS_DIR / "solution_report.docx", "solution_report.docx")
-        render_download_button("下载 PDF 报告", REPORTS_DIR / "solution_report.pdf", "solution_report.pdf")
-        if CODE_DIR.exists():
-            st.download_button("下载代码 zip", make_zip([CODE_DIR]), file_name="code.zip", use_container_width=True)
-        if FIGURES_DIR.exists():
-            st.download_button("下载图表 zip", make_zip([FIGURES_DIR]), file_name="figures.zip", use_container_width=True)
-        if LOGS_DIR.exists():
-            st.download_button("下载日志 zip", make_zip([LOGS_DIR]), file_name="logs.zip", use_container_width=True)
+        if state_to_dict(st.session_state.get("last_state")):
+            render_download_button("下载 Markdown 报告", REPORTS_DIR / "solution_report.md", "solution_report.md")
+            render_download_button("下载 Word 报告", REPORTS_DIR / "solution_report.docx", "solution_report.docx")
+            render_download_button("下载 PDF 报告", REPORTS_DIR / "solution_report.pdf", "solution_report.pdf")
+            code_files = list_current_files(CODE_DIR, {".py"})
+            figure_files = list_current_figures(FIGURES_DIR)
+            log_files = list_current_files(LOGS_DIR, {".json", ".jsonl"})
+            if code_files:
+                st.download_button("下载代码 zip", make_zip(code_files), file_name="code.zip", use_container_width=True)
+            if figure_files:
+                st.download_button("下载图表 zip", make_zip(figure_files), file_name="figures.zip", use_container_width=True)
+            if log_files:
+                st.download_button("下载日志 zip", make_zip(log_files), file_name="logs.zip", use_container_width=True)
+        else:
+            st.caption("当前会话暂无产物。启动新任务后这里会出现下载项。")
 
     return {
         "provider": "deepseek",
@@ -951,6 +1002,10 @@ def run_workflow(config: dict[str, Any]) -> None:
             "macOS/Linux: export DEEPSEEK_API_KEY=你的key；Windows PowerShell: $env:DEEPSEEK_API_KEY='你的key'",
         )
         st.stop()
+
+    st.session_state.pop("last_state", None)
+    st.session_state.pop("effective_provider", None)
+    st.session_state[RUN_STARTED_KEY] = datetime.now().timestamp()
 
     stage_box = st.container()
     progress = st.progress(0, text="Agent is preparing...")
@@ -1001,13 +1056,13 @@ def run_workflow(config: dict[str, Any]) -> None:
         st.session_state["effective_provider"] = effective_provider
 
         state_dict = state_to_dict(state)
-        figure_count = len(list_figures(get_output_path(state_dict, "figures_dir", FIGURES_DIR)))
-        code_count = len(list_files(get_output_path(state_dict, "code_dir", CODE_DIR), {".py"}))
-        log_count = len(list_files(LOGS_DIR, {".json", ".jsonl"}))
+        figure_count = len(list_current_figures(get_output_path(state_dict, "figures_dir", FIGURES_DIR)))
+        code_count = len(list_current_files(get_output_path(state_dict, "code_dir", CODE_DIR), {".py"}))
+        log_count = len(list_current_files(LOGS_DIR, {".json", ".jsonl"}))
         st.success("运行完成。")
         cols = st.columns(4)
         with cols[0]:
-            metric_card("报告", "Ready" if (REPORTS_DIR / "solution_report.md").exists() else "Pending", "outputs/reports", "📄")
+            metric_card("报告", "Ready" if is_current_session_file(REPORTS_DIR / "solution_report.md") else "Pending", "outputs/reports", "📄")
         with cols[1]:
             metric_card("图表", figure_count, "figures", "📈")
         with cols[2]:
@@ -1064,14 +1119,15 @@ def launch_panel(config: dict[str, Any], state: dict[str, Any]) -> None:
 
 
 def artifact_overview(state: dict[str, Any]) -> None:
-    section("ARTIFACTS", "产物概览", "当前 outputs 目录下可查看和下载的结果。")
+    section("ARTIFACTS", "产物概览", "仅展示本次会话生成的报告、代码、图表和日志。")
     reports = [REPORTS_DIR / "solution_report.md", REPORTS_DIR / "solution_report.docx", REPORTS_DIR / "solution_report.pdf"]
-    figures = list_figures(FIGURES_DIR)
-    code_files = list_files(CODE_DIR, {".py"})
-    logs = visible_artifact_files(list_files(LOGS_DIR, {".json", ".jsonl"}))
+    current_reports = [path for path in reports if is_current_session_file(path)]
+    figures = list_current_figures(FIGURES_DIR)
+    code_files = list_current_files(CODE_DIR, {".py"})
+    logs = list_current_files(LOGS_DIR, {".json", ".jsonl"})
     cols = st.columns(4)
     with cols[0]:
-        artifact_card("Reports", sum(p.exists() for p in reports), "Markdown / Word / PDF", "ok" if any(p.exists() for p in reports) else "warn")
+        artifact_card("Reports", len(current_reports), "Markdown / Word / PDF", "ok" if current_reports else "warn")
     with cols[1]:
         artifact_card("Figures", len(figures), "Generated images", "ok" if figures else "warn")
     with cols[2]:
@@ -1085,8 +1141,7 @@ def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> None:
 
     section("MISSION CONTROL", "运行总览", "查看 Agent 工作流完成度、关键指标和产物状态。")
     if not state:
-        empty_state("尚未发现运行结果", "上传赛题文件后启动自动建模。也可以查看已有 outputs 中的报告、图表和日志。")
-        artifact_overview(state)
+        empty_state("尚未发现本次运行结果", "上传赛题文件后启动自动建模。重新进入页面时，上一题产物不会自动载入。")
         return
 
     done, total = workflow_completion(state)
@@ -1097,7 +1152,7 @@ def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> None:
     data_profile = get_section(state, "data_profile", "data_profile.json")
     strategies = get_section(state, "candidate_strategies", "model_recommendations.json")
     execution_result = get_section(state, "execution_result")
-    figures = list_figures(get_output_path(state, "figures_dir", FIGURES_DIR))
+    figures = list_current_figures(get_output_path(state, "figures_dir", FIGURES_DIR))
 
     cols = st.columns(6)
     with cols[0]:
@@ -1111,7 +1166,7 @@ def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> None:
     with cols[4]:
         metric_card("代码执行", "成功" if execution_result.get("success") else "未成功", "最近执行", "⚙️")
     with cols[5]:
-        metric_card("报告", "已生成" if (REPORTS_DIR / "solution_report.md").exists() else "未生成", "Markdown", "📄")
+        metric_card("报告", "已生成" if is_current_session_file(REPORTS_DIR / "solution_report.md") else "未生成", "Markdown", "📄")
 
     selected_model = get_section(state, "selected_model")
     selected_solution = selected_model.get("selected_solution", {}) if isinstance(selected_model, dict) else {}
@@ -1125,7 +1180,7 @@ def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> None:
     with cols[2]:
         soft_card("数据使用", "检测到结构化数据" if data_profile.get("table_count", 0) else "未检测到结构化数据", ["data"])
     with cols[3]:
-        soft_card("报告状态", "可在论文报告 Tab 查看" if (REPORTS_DIR / "solution_report.md").exists() else "尚未生成", ["report"])
+        soft_card("报告状态", "可在论文报告 Tab 查看" if is_current_session_file(REPORTS_DIR / "solution_report.md") else "尚未生成", ["report"])
     st.markdown("</div>", unsafe_allow_html=True)
     artifact_overview(state)
 
@@ -1220,13 +1275,13 @@ def render_data_profile_tab(state: dict[str, Any]) -> None:
                 st.markdown("**字段类型**")
                 st.json(item.get("column_types", {}))
 
-    figs = list_figures(FIGURES_DIR / "data_profile")
+    figs = list_current_figures(FIGURES_DIR / "data_profile")
     if figs:
         st.markdown("#### 数据画像图")
         cols = st.columns(3)
         for i, fig in enumerate(figs):
             with cols[i % 3]:
-                st.image(str(fig), caption=fig.name)
+                render_image_file(fig, caption=fig.name)
                 st.download_button(f"下载 {fig.name}", fig.read_bytes(), file_name=fig.name, key=f"dp-{i}", use_container_width=True)
     maybe_json("数据画像 JSON", profile)
 
@@ -1336,7 +1391,7 @@ def render_solution_tab(state: dict[str, Any]) -> None:
 def render_formula_figure_tab(state: dict[str, Any]) -> None:
     formulas = get_section(state, "formulas", "formulas.json")
     figure_plan = get_section(state, "figure_plan", "figure_plan.json")
-    figures = list_figures(get_output_path(state, "figures_dir", FIGURES_DIR))
+    figures = list_current_figures(get_output_path(state, "figures_dir", FIGURES_DIR))
     if not formulas and not figure_plan and not figures:
         empty_state("等待公式与图表", "运行后会展示 LaTeX 公式、图表规划和生成图片。")
         return
@@ -1387,7 +1442,7 @@ def render_formula_figure_tab(state: dict[str, Any]) -> None:
         for idx, fig in enumerate(filtered):
             with cols[idx % 3]:
                 st.markdown('<div class="glass">', unsafe_allow_html=True)
-                st.image(str(fig), caption=fig.name)
+                render_image_file(fig, caption=fig.name)
                 st.caption(f"{fig.suffix.upper()} · {file_size(fig)}")
                 st.download_button("下载图表", fig.read_bytes(), file_name=fig.name, key=f"fig-{idx}-{fig.name}", use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -1401,7 +1456,7 @@ def render_execution_tab(state: dict[str, Any]) -> None:
     attempts = get_section(state, "execution_attempts", "execution_attempts.json")
     execution_result = get_section(state, "execution_result")
     code_dir = get_output_path(state, "code_dir", CODE_DIR)
-    code_files = list_files(code_dir)
+    code_files = list_current_files(code_dir)
     if not attempts and not execution_result and not code_files:
         empty_state("等待代码执行", "运行后会展示执行状态、修复过程、stdout/stderr 和代码文件。")
         return
@@ -1506,7 +1561,7 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
 
 def render_report_tab(state: dict[str, Any]) -> None:
     report_path = REPORTS_DIR / "solution_report.md"
-    if not report_path.exists():
+    if not state or not is_current_session_file(report_path):
         empty_state("报告尚未生成", "运行完整工作流后会生成 outputs/reports/solution_report.md。")
         return
     section("REPORT READER", "论文报告", "以阅读器形式预览 Markdown 报告，并下载 Markdown / Word / PDF。")
@@ -1538,10 +1593,10 @@ def render_report_tab(state: dict[str, Any]) -> None:
 
 def render_logs_tab(state: dict[str, Any]) -> None:
     section("LOGS", "运行日志", "选择日志文件查看结构化跟踪信息。Expert Mode 下可查看更多细节。")
-    if not LOGS_DIR.exists():
+    if not state or not LOGS_DIR.exists():
         empty_state("暂无日志目录", "运行后日志会保存在 outputs/logs。")
         return
-    log_files = visible_artifact_files(list_files(LOGS_DIR))
+    log_files = list_current_files(LOGS_DIR)
     if not log_files:
         empty_state("暂无日志文件", "运行后会展示 JSON、JSONL 等日志文件。")
         return
