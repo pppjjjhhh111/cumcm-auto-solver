@@ -1,0 +1,16 @@
+results_dir: quality_results
+tasks:
+  - task_id: quality_prediction_case
+    problem_file: quality_cases/prediction_case/problem.txt
+    data_dir: quality_cases/prediction_case/data
+    expected_problem_type: prediction
+    expected_outputs:
+      - outputs/reports/solution_report.md
+      - outputs/logs/report_quality_check.json
+      - outputs/logs/consistency_check.json
+      - outputs/logs/result_sanity_check.json
+    scoring_rubric:
+      report_quality_weight: 0.35
+      consistency_weight: 0.25
+      execution_weight: 0.25
+      figure_weight: 0.15

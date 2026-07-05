@@ -17,6 +17,7 @@ class PaperWriterAgent(BaseAgent):
         "问题重述",
         "问题分析",
         "建模方案比较与选择",
+        "模型选择理由",
         "模型假设",
         "符号说明",
         "数据预处理与探索性分析",
@@ -108,6 +109,7 @@ class PaperWriterAgent(BaseAgent):
         pattern_summary = self._pattern_detail_lines(pattern_selection)
         assumptions = self._combined_list(pattern_selection, "common_assumptions")
         solution_competition = self._solution_competition_section(selected_model)
+        model_selection_reason = self._model_selection_reason_section(selected_model)
         symbol_table = self._symbol_table(formulas)
         formula_blocks = self._formula_blocks(formulas)
         data_profile_section = self._data_profile_section(data_profile)
@@ -148,6 +150,10 @@ class PaperWriterAgent(BaseAgent):
 ## 建模方案比较与选择
 
 {solution_competition}
+
+## 模型选择理由
+
+{model_selection_reason}
 
 ## 模型假设
 
@@ -231,6 +237,42 @@ class PaperWriterAgent(BaseAgent):
             f"选择理由：{selected.get('paper_narrative', selected.get('overall_idea', ''))}\n\n"
             f"风险提示：\n\n{risks}"
         )
+
+    def _model_selection_reason_section(self, selected_model: dict[str, Any]) -> str:
+        trace = selected_model.get("model_selection_trace", {})
+        task_traces = trace.get("task_traces", [])
+        if not task_traces:
+            return "暂无模型选择追踪日志，请查看 `outputs/logs/model_selection_trace.json`。"
+        lines = [
+            "| 任务 | 选中模型 | 总分 | 主要理由 | 主要风险 |",
+            "| --- | --- | ---: | --- | --- |",
+        ]
+        for item in task_traces:
+            selected = item.get("selected_model", {})
+            scores = selected.get("scores", {})
+            risks = item.get("current_model_risks", [])
+            lines.append(
+                f"| {item.get('task_id', '')} | "
+                f"{selected.get('name', selected.get('model_id', ''))} | "
+                f"{scores.get('total_score', selected.get('total_score', ''))} | "
+                f"{item.get('selection_reason', '')} | "
+                f"{'; '.join(str(risk) for risk in risks[:3]) or '-'} |"
+            )
+        rejected_lines = []
+        for item in task_traces:
+            rejected = item.get("rejected_candidates", [])
+            if not rejected:
+                continue
+            for candidate in rejected[:2]:
+                rejected_lines.append(
+                    f"- 任务 {item.get('task_id')} 的备选 `{candidate.get('name')}` 未入选："
+                    f"{candidate.get('why_not_selected')}"
+                )
+        sections = ["\n".join(lines)]
+        if rejected_lines:
+            sections.append("备选模型取舍说明：\n\n" + "\n".join(rejected_lines))
+        sections.append("详细评分日志保存于 `outputs/logs/model_selection_trace.json`。")
+        return "\n\n".join(sections)
 
     def _symbol_table(self, formulas: dict[str, Any]) -> str:
         variables = formulas.get("variables") or [

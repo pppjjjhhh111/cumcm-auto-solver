@@ -26,13 +26,21 @@ def test_minimal_workflow_runs() -> None:
     assert (output_dir / "logs" / "model_recommendations.json").exists()
     assert (output_dir / "logs" / "solution_competition.json").exists()
     assert (output_dir / "logs" / "execution_attempts.json").exists()
+    assert (output_dir / "logs" / "result_sanity_check.json").exists()
+    assert (output_dir / "logs" / "model_selection_trace.json").exists()
+    assert (output_dir / "logs" / "consistency_check.json").exists()
+    assert (output_dir / "logs" / "report_quality_check.json").exists()
     assert (output_dir / "logs" / "paper_pattern_selection.json").exists()
+    assert (output_dir / "reports" / "report_quality_summary.md").exists()
     assert (output_dir / "code_workspace").exists()
     assert state.result_analysis["status"] == "ok"
+    assert state.result_sanity_check["status"] == "pass"
+    assert state.report_quality["final_score"] > 0
     assert state.solution_competition["selected_solution"]["solution_name"]
     assert state.selected_model["selected_strategy"]["solution_name"] == state.solution_competition["selected_solution"]["solution_name"]
 
     report_text = Path(state.paper["report_path"]).read_text(encoding="utf-8")
     assert "## \u5efa\u6a21\u65b9\u6848\u6bd4\u8f83\u4e0e\u9009\u62e9" in report_text
+    assert "## \u6a21\u578b\u9009\u62e9\u7406\u7531" in report_text
     assert "## \u5404\u5c0f\u95ee\u6a21\u578b\u5efa\u7acb\u4e0e\u6c42\u89e3" in report_text
     assert "## \u6a21\u578b\u8bc4\u4ef7" in report_text

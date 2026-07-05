@@ -44,6 +44,7 @@ WORKFLOW_STEPS = [
     ("结果分析", "result_analysis", "Analyze"),
     ("反思修订", "reflection_report", "Reflect"),
     ("报告生成", "paper", "Report"),
+    ("质量评分", "report_quality", "Quality"),
 ]
 
 st.set_page_config(
@@ -1136,6 +1137,33 @@ def artifact_overview(state: dict[str, Any]) -> None:
         artifact_card("Logs", len(logs), "JSON / JSONL traces", "ok" if logs else "warn")
 
 
+def render_quality_snapshot(state: dict[str, Any]) -> None:
+    report_quality = get_section(state, "report_quality", "report_quality_check.json")
+    consistency = get_section(state, "consistency_check", "consistency_check.json")
+    sanity = get_section(state, "result_sanity_check", "result_sanity_check.json")
+    if not report_quality and not consistency and not sanity:
+        return
+    section("QUALITY GATES", "质量评分", "查看报告质量、一致性和结果健壮性。")
+    cols = st.columns(3)
+    with cols[0]:
+        metric_card("Report Quality", report_quality.get("final_score", "-"), report_quality.get("quality_level", "not ready"), "QA")
+    with cols[1]:
+        metric_card("Consistency", consistency.get("consistency_score", "-"), consistency.get("status", "not ready"), "SYNC")
+    with cols[2]:
+        metric_card("Result Sanity", sanity.get("sanity_score", "-"), sanity.get("status", "not ready"), "OK")
+    issues = as_list(report_quality.get("issues")) if isinstance(report_quality, dict) else []
+    failures = as_list(consistency.get("failures")) if isinstance(consistency, dict) else []
+    if issues or failures:
+        with st.expander("需要关注的质量问题", expanded=False):
+            for issue in issues[:6]:
+                st.warning(str(issue))
+            for failure in failures[:6]:
+                if isinstance(failure, dict):
+                    st.error(f"{failure.get('name')}: {failure.get('message')}")
+                else:
+                    st.error(str(failure))
+
+
 def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> None:
     launch_panel(config, state)
 
@@ -1182,6 +1210,7 @@ def render_dashboard(state: dict[str, Any], config: dict[str, Any]) -> None:
     with cols[3]:
         soft_card("报告状态", "可在论文报告 Tab 查看" if is_current_session_file(REPORTS_DIR / "solution_report.md") else "尚未生成", ["report"])
     st.markdown("</div>", unsafe_allow_html=True)
+    render_quality_snapshot(state)
     artifact_overview(state)
 
 
@@ -1559,6 +1588,66 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
     maybe_json("反思 JSON", reflection)
 
 
+def render_quality_tab(state: dict[str, Any]) -> None:
+    report_quality = get_section(state, "report_quality", "report_quality_check.json")
+    consistency = get_section(state, "consistency_check", "consistency_check.json")
+    sanity = get_section(state, "result_sanity_check", "result_sanity_check.json")
+    summary_path = REPORTS_DIR / "report_quality_summary.md"
+    if not report_quality and not consistency and not sanity:
+        empty_state("等待质量评分", "报告生成后会展示结构完整性、一致性和执行结果健壮性。")
+        return
+    section("QUALITY SCORE", "质量评分", "读取后端质量检查日志，辅助判断报告是否可进入人工精修。")
+    cols = st.columns(4)
+    with cols[0]:
+        metric_card("Final Score", report_quality.get("final_score", "-"), report_quality.get("quality_level", "not ready"), "QA")
+    with cols[1]:
+        metric_card("Consistency", consistency.get("consistency_score", "-"), consistency.get("status", "not ready"), "SYNC")
+    with cols[2]:
+        metric_card("Sanity", sanity.get("sanity_score", "-"), sanity.get("status", "not ready"), "OK")
+    with cols[3]:
+        metric_card("Repair Iterations", sanity.get("repair_iterations", "-"), "代码修复次数", "FIX")
+
+    st.markdown("#### 质量维度")
+    scores = report_quality.get("scores", {}) if isinstance(report_quality, dict) else {}
+    if scores:
+        for key, value in scores.items():
+            score_bar(key.replace("_", " "), value)
+    else:
+        st.caption("暂无报告质量维度。")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("#### 主要问题")
+        issues = as_list(report_quality.get("issues")) if isinstance(report_quality, dict) else []
+        failures = as_list(consistency.get("failures")) if isinstance(consistency, dict) else []
+        if issues or failures:
+            for issue in issues[:8]:
+                st.warning(str(issue))
+            for failure in failures[:8]:
+                if isinstance(failure, dict):
+                    st.error(f"{failure.get('name')}: {failure.get('message')}")
+        else:
+            st.success("未发现阻断性质量问题。")
+    with right:
+        st.markdown("#### 修订建议")
+        suggestions = as_list(report_quality.get("suggested_fixes")) if isinstance(report_quality, dict) else []
+        suggestions += as_list(consistency.get("suggested_fixes")) if isinstance(consistency, dict) else []
+        if suggestions:
+            for suggestion in suggestions[:8]:
+                st.info(str(suggestion))
+        else:
+            st.caption("暂无修订建议。")
+
+    if is_current_session_file(summary_path):
+        st.markdown("#### 质量摘要")
+        st.markdown(read_text(summary_path, 12000))
+        render_download_button("下载质量摘要", summary_path, "report_quality_summary.md")
+
+    maybe_json("报告质量 JSON", report_quality)
+    maybe_json("一致性检查 JSON", consistency)
+    maybe_json("结果健壮性 JSON", sanity)
+
+
 def render_report_tab(state: dict[str, Any]) -> None:
     report_path = REPORTS_DIR / "solution_report.md"
     if not state or not is_current_session_file(report_path):
@@ -1638,6 +1727,7 @@ def main() -> None:
             "公式与图表",
             "代码执行",
             "反思与修订",
+            "质量评分",
             "论文报告",
             "运行日志",
         ]
@@ -1660,8 +1750,10 @@ def main() -> None:
     with tabs[7]:
         render_reflection_tab(state)
     with tabs[8]:
-        render_report_tab(state)
+        render_quality_tab(state)
     with tabs[9]:
+        render_report_tab(state)
+    with tabs[10]:
         render_logs_tab(state)
 
 

@@ -104,6 +104,9 @@ def main() -> int:
     print(f"Figures dir: {state.figures_dir}")
     print(f"Logs dir: {state.logs_dir}")
     print(f"Execution success: {state.execution_result.get('success')}")
+    if state.report_quality:
+        print(f"Report quality: {state.report_quality.get('final_score')} ({state.report_quality.get('quality_level')})")
+        print(f"Quality summary: {state.reports_dir / 'report_quality_summary.md'}")
     if state.exports:
         print(f"Exports: {state.exports}")
     return 0 if state.paper.get("report_path") else 1

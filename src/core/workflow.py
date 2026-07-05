@@ -20,11 +20,13 @@ from src.agents.validation import ValidationAgent
 from src.core.llm_client import LLMClient, MockLLMClient
 from src.core.state import SolverState
 from src.rag.retriever import Retriever
+from src.tools.consistency_checker import ConsistencyChecker
 from src.tools.data_profiler import DataProfiler
 from src.tools.file_loader import FileLoader
 from src.tools.python_executor import PythonExecutor
 from src.tools.report_exporter import ReportExporter
-from src.utils.json_utils import write_json
+from src.tools.report_quality_checker import ReportQualityChecker
+from src.utils.json_utils import read_json, write_json
 from src.utils.path_utils import ensure_output_tree
 
 
@@ -218,6 +220,7 @@ class WorkflowRunner:
             )
             self._log(f"{paper_writer.name}_final", {k: v for k, v in state.paper.items() if k != "markdown"})
 
+        self._run_quality_checks(state)
         state.artifacts["report_path"] = state.paper.get("report_path")
         state.exports = self._export_reports(state)
         if state.exports:
@@ -281,6 +284,106 @@ class WorkflowRunner:
         write_json(state.logs_dir / "execution_attempts.json", state.execution_attempts)
         if state.execution_result.get("code_file"):
             state.artifacts["last_code_file"] = state.execution_result["code_file"]
+        state.result_sanity_check = self._build_result_sanity_check(state)
+        write_json(state.logs_dir / "result_sanity_check.json", state.result_sanity_check)
+
+    def _build_result_sanity_check(self, state: SolverState) -> dict[str, Any]:
+        result_path = state.code_dir / "analysis_results.json"
+        summary_path = state.code_dir / "summary_table.csv"
+        result_payload: dict[str, Any] = {}
+        if result_path.exists():
+            try:
+                result_payload = read_json(result_path)
+            except (OSError, ValueError) as exc:
+                result_payload = {"read_error": str(exc)}
+        generated_figures = [
+            path
+            for path in state.figures_dir.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+        ]
+        checks = [
+            {
+                "name": "execution_success",
+                "passed": bool(state.execution_result.get("success")),
+                "detail": state.execution_result.get("returncode"),
+            },
+            {
+                "name": "analysis_results_exists",
+                "passed": result_path.exists(),
+                "detail": str(result_path),
+            },
+            {
+                "name": "summary_table_exists",
+                "passed": summary_path.exists(),
+                "detail": str(summary_path),
+            },
+            {
+                "name": "analysis_has_rows",
+                "passed": int(result_payload.get("row_count", 0) or 0) >= 0 and "read_error" not in result_payload,
+                "detail": result_payload.get("row_count", 0),
+            },
+            {
+                "name": "figures_exist",
+                "passed": bool(generated_figures),
+                "detail": [str(path) for path in generated_figures[:20]],
+            },
+        ]
+        passed = sum(1 for check in checks if check["passed"])
+        return {
+            "checker": "ResultSanityCheck",
+            "status": "pass" if passed == len(checks) else "needs_review",
+            "passed_checks": passed,
+            "total_checks": len(checks),
+            "sanity_score": round(100 * passed / max(len(checks), 1), 2),
+            "checks": checks,
+            "repair_iterations": len([item for item in state.execution_attempts if int(item.get("attempt", 0) or 0) > 0]),
+            "final_stderr_tail": str(state.execution_result.get("stderr", ""))[-2000:],
+        }
+
+    def _run_quality_checks(self, state: SolverState) -> None:
+        try:
+            consistency_checker = ConsistencyChecker(state.logs_dir)
+            state.consistency_check = consistency_checker.check(
+                parsed_problem=state.parsed_problem,
+                decomposed_tasks=state.decomposed_tasks,
+                selected_model=state.selected_model,
+                formulas=state.formulas,
+                figure_plan=state.figure_plan,
+                execution_result=state.execution_result,
+                result_analysis=state.result_analysis,
+                paper=state.paper,
+            )
+            self._log("ConsistencyChecker", state.consistency_check)
+        except Exception as exc:  # pragma: no cover - defensive guard for preserving workflow artifacts.
+            state.consistency_check = {
+                "checker": "ConsistencyChecker",
+                "status": "error",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+            state.errors.append({"stage": "consistency_check", "error": state.consistency_check["error"]})
+            write_json(state.logs_dir / "consistency_check.json", state.consistency_check)
+
+        try:
+            report_path = Path(state.paper.get("report_path", ""))
+            quality_checker = ReportQualityChecker(state.logs_dir, state.reports_dir)
+            state.report_quality = quality_checker.check(
+                report_path=report_path,
+                parsed_problem=state.parsed_problem,
+                selected_model=state.selected_model,
+                formulas=state.formulas,
+                figure_plan=state.figure_plan,
+                execution_result=state.execution_result,
+                consistency_check=state.consistency_check,
+            )
+            self._log("ReportQualityChecker", state.report_quality)
+        except Exception as exc:  # pragma: no cover - defensive guard for preserving workflow artifacts.
+            state.report_quality = {
+                "checker": "ReportQualityChecker",
+                "status": "error",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+            state.errors.append({"stage": "report_quality_check", "error": state.report_quality["error"]})
+            write_json(state.logs_dir / "report_quality_check.json", state.report_quality)
 
     def _retrieve_rag(self, state: SolverState) -> list[dict[str, Any]]:
         query_parts = [

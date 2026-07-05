@@ -21,6 +21,9 @@ def compute_metrics(state: Any, runtime_seconds: float, expected_problem_type: s
         "data_usage_score": 1.0 if state.raw_data else 0.5,
         "figure_count": len(state.result_analysis.get("figures", [])),
         "model_alignment_score": model_alignment,
+        "report_quality_score": state.report_quality.get("final_score", 0),
+        "consistency_score": state.consistency_check.get("consistency_score", 0),
+        "result_sanity_score": state.result_sanity_check.get("sanity_score", 0),
         "repair_iterations": max(0, len(state.execution_attempts) - 1),
         "runtime_seconds": round(runtime_seconds, 3),
     }
