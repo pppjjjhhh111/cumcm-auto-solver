@@ -819,6 +819,8 @@ def get_output_path(state: dict[str, Any], key: str, fallback: Path) -> Path:
 
 
 def get_section(state: dict[str, Any], state_key: str, fallback_log: str | None = None) -> Any:
+    if not state:
+        return {}
     value = state.get(state_key)
     if value not in (None, {}, []):
         if contains_legacy_sample_reference(value):
@@ -830,6 +832,13 @@ def get_section(state: dict[str, Any], state_key: str, fallback_log: str | None 
             return {}
         return load_json(LOGS_DIR / fallback_log, {})
     return {}
+
+
+def require_active_state(state: dict[str, Any], title: str, body: str) -> bool:
+    if state:
+        return True
+    render_empty_state(title, body)
+    return False
 
 
 def as_list(value: Any) -> list[Any]:
@@ -1293,7 +1302,9 @@ def render_dashboard(state: dict[str, Any]) -> None:
 
 
 def render_problem_tab(state: dict[str, Any]) -> None:
-    parsed = get_section(state, "parsed_problem") or latest_log("*ProblemParserAgent*.json")
+    if not require_active_state(state, "暂无题目解析", "上传赛题并完成一次运行后，这里会展示当前题目的结构化解析结果。"):
+        return
+    parsed = get_section(state, "parsed_problem")
     if not parsed:
         render_empty_state("暂无题目解析", "运行工作流后会在这里展示背景、小问、关键词和题型判断。")
         return
@@ -1333,6 +1344,8 @@ def render_problem_tab(state: dict[str, Any]) -> None:
 
 
 def render_data_profile_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无数据画像", "上传赛题并完成一次运行后，这里会展示当前任务的数据画像结果。"):
+        return
     profile = get_section(state, "data_profile", "data_profile.json")
     if not profile:
         render_empty_state("暂无数据画像", "没有数据文件或尚未运行工作流时，会跳过数据画像。")
@@ -1427,6 +1440,8 @@ def render_candidate_card(candidate: dict[str, Any], selected: bool = False) -> 
 
 
 def render_strategy_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无建模策略", "上传赛题并完成一次运行后，这里会展示当前任务的 Model Zoo 推荐和模型评分。"):
+        return
     strategies = get_section(state, "candidate_strategies", "model_recommendations.json")
     selected_model = get_section(state, "selected_model")
     selected_by_task = {
@@ -1464,6 +1479,8 @@ def render_strategy_tab(state: dict[str, Any]) -> None:
 
 
 def render_solution_competition_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无方案比较", "上传赛题并完成一次运行后，这里会展示当前任务的多方案竞争结果。"):
+        return
     competition = get_section(state, "solution_competition", "solution_competition.json")
     if not competition:
         render_empty_state("暂无多方案比较", "运行工作流后会展示 conservative / advanced / hybrid 三套完整方案。")
@@ -1503,6 +1520,8 @@ def render_solution_competition_tab(state: dict[str, Any]) -> None:
 
 
 def render_formula_figure_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无公式与图表", "上传赛题并完成一次运行后，这里会展示当前任务的公式、图表规划和生成图像。"):
+        return
     formulas = get_section(state, "formulas", "formulas.json")
     figure_plan = get_section(state, "figure_plan", "figure_plan.json")
     figures_dir = get_output_path(state, "figures_dir", FIGURES_DIR)
@@ -1568,6 +1587,8 @@ def render_formula_figure_tab(state: dict[str, Any]) -> None:
 
 
 def render_code_execution_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无代码执行结果", "上传赛题并完成一次运行后，这里会展示当前任务的代码、stdout、stderr 和修复记录。"):
+        return
     attempts = get_section(state, "execution_attempts", "execution_attempts.json")
     execution_result = get_section(state, "execution_result")
     code_dir = get_output_path(state, "code_dir", CODE_DIR)
@@ -1628,6 +1649,8 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
 
 
 def render_reflection_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无反思与修订结果", "上传赛题并完成一次运行后，这里会展示当前任务的反思评分和修订建议。"):
+        return
     reflection = get_section(state, "reflection_report", "reflection_report.json")
     if not reflection:
         render_empty_state("暂无反思结果", "Reflection Loop 未启用或尚未运行时，这里会保持为空。")
@@ -1683,6 +1706,8 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
 
 
 def render_report_tab(state: dict[str, Any]) -> None:
+    if not require_active_state(state, "暂无论文报告", "上传赛题并完成一次运行后，这里会展示当前任务生成的 Markdown / Word / PDF 报告。"):
+        return
     report_path = REPORTS_DIR / "solution_report.md"
     docx_path = REPORTS_DIR / "solution_report.docx"
     pdf_path = REPORTS_DIR / "solution_report.pdf"
@@ -1704,8 +1729,10 @@ def render_report_tab(state: dict[str, Any]) -> None:
         st.markdown(read_text(report_path))
 
 
-def render_logs_tab(_: dict[str, Any]) -> None:
+def render_logs_tab(state: dict[str, Any]) -> None:
     render_section_header("Log Observatory", "运行日志", "左侧选择日志文件，右侧查看结构化内容。")
+    if not require_active_state(state, "暂无运行日志", "上传赛题并完成一次运行后，这里会展示当前任务产生的 JSON、JSONL 日志。"):
+        return
     if not LOGS_DIR.exists():
         render_empty_state("暂无日志目录", "运行后日志会保存在 outputs/logs。")
         return

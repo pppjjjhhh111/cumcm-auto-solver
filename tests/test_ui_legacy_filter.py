@@ -15,3 +15,11 @@ def test_ui_hides_legacy_sample_artifacts(tmp_path) -> None:
     assert app.is_legacy_sample_artifact(fresh_log) is False
     assert app.visible_artifact_files([legacy_log, fresh_log]) == [fresh_log]
 
+
+def test_empty_state_does_not_read_fallback_logs(tmp_path, monkeypatch) -> None:
+    fallback = tmp_path / "model_recommendations.json"
+    fallback.write_text(json.dumps({"strategies": [{"task_id": "old"}]}), encoding="utf-8")
+    monkeypatch.setattr(app, "LOGS_DIR", tmp_path)
+
+    assert app.get_section({}, "candidate_strategies", "model_recommendations.json") == {}
+
