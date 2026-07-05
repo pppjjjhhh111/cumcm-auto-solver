@@ -33,17 +33,17 @@ REPORTS_DIR = OUTPUT_DIR / "reports"
 SUPPORTED_FILES = ["pdf", "docx", "txt", "csv", "xlsx"]
 
 WORKFLOW_STEPS = [
-    ("文件读取", "file_loader"),
-    ("题目解析", "parsed_problem"),
-    ("数据画像", "data_profile"),
-    ("策略生成", "candidate_strategies"),
-    ("方案竞争", "solution_competition"),
-    ("公式生成", "formulas"),
-    ("图表规划", "figure_plan"),
-    ("代码执行", "execution_result"),
-    ("结果分析", "result_analysis"),
-    ("反思修订", "reflection_report"),
-    ("报告生成", "paper"),
+    ("文件读取", "file_loader", "Input"),
+    ("题目解析", "parsed_problem", "Parse"),
+    ("数据画像", "data_profile", "Profile"),
+    ("策略生成", "candidate_strategies", "Model"),
+    ("方案竞争", "solution_competition", "Compete"),
+    ("公式生成", "formulas", "Formula"),
+    ("图表规划", "figure_plan", "Figure"),
+    ("代码执行", "execution_result", "Execute"),
+    ("结果分析", "result_analysis", "Analyze"),
+    ("反思修订", "reflection_report", "Reflect"),
+    ("报告生成", "paper", "Report"),
 ]
 
 
@@ -60,178 +60,362 @@ def inject_css() -> None:
         """
         <style>
         :root {
-            --bg: #f7f8fa;
-            --panel: #ffffff;
-            --border: #e5e7eb;
-            --border-strong: #d1d5db;
-            --text: #111827;
-            --muted: #6b7280;
-            --accent: #2563eb;
-            --accent-soft: #eff6ff;
-            --teal: #0f766e;
-            --teal-soft: #ecfdf5;
-            --amber: #a16207;
-            --amber-soft: #fffbeb;
-            --danger: #b91c1c;
-            --danger-soft: #fef2f2;
-            --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
+            --bg: #020617;
+            --bg-2: #08111f;
+            --panel: rgba(15, 23, 42, 0.72);
+            --panel-strong: rgba(15, 23, 42, 0.88);
+            --panel-soft: rgba(30, 41, 59, 0.56);
+            --border: rgba(148, 163, 184, 0.18);
+            --border-strong: rgba(34, 211, 238, 0.34);
+            --text: #e5eefb;
+            --muted: #94a3b8;
+            --muted-2: #64748b;
+            --cyan: #22d3ee;
+            --cyan-soft: rgba(34, 211, 238, 0.12);
+            --blue: #60a5fa;
+            --violet: #a78bfa;
+            --green: #34d399;
+            --amber: #fbbf24;
+            --red: #fb7185;
+            --shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+            --glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.38), 0 0 36px rgba(34, 211, 238, 0.18);
         }
 
         .stApp {
-            background: var(--bg);
+            background:
+                radial-gradient(circle at 78% -8%, rgba(124, 58, 237, 0.28), transparent 32rem),
+                radial-gradient(circle at 12% 4%, rgba(34, 211, 238, 0.18), transparent 28rem),
+                linear-gradient(135deg, #020617 0%, #07111f 42%, #0f172a 100%);
             color: var(--text);
+        }
+
+        .stApp::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+            background-size: 42px 42px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.18) 54%, transparent);
         }
 
         .block-container {
-            padding-top: 1.6rem;
-            padding-bottom: 3rem;
+            position: relative;
+            z-index: 1;
             max-width: 1440px;
+            padding-top: 1.85rem;
+            padding-bottom: 3rem;
+        }
+
+        h1, h2, h3, h4, h5, h6, p, li, label, span, div {
+            letter-spacing: 0;
         }
 
         [data-testid="stSidebar"] {
-            background: #ffffff;
-            border-right: 1px solid var(--border);
+            background:
+                linear-gradient(180deg, rgba(2, 6, 23, 0.94), rgba(15, 23, 42, 0.86)),
+                radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.11), transparent 18rem);
+            border-right: 1px solid rgba(34, 211, 238, 0.18);
+            box-shadow: 18px 0 54px rgba(0, 0, 0, 0.24);
         }
 
-        div[data-testid="stButton"] > button {
-            border-radius: 6px;
-            border: 1px solid var(--border-strong);
+        [data-testid="stSidebar"] * {
+            color: var(--text);
+        }
+
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+        [data-testid="stSidebar"] .stCaptionContainer {
+            color: var(--muted);
+        }
+
+        [data-testid="stSidebar"] section,
+        [data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+            gap: 0.74rem;
+        }
+
+        .sidebar-title {
+            margin: 0 0 12px;
+            padding: 14px 14px 12px;
+            border: 1px solid rgba(34, 211, 238, 0.22);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.62);
+            box-shadow: var(--shadow);
+        }
+
+        .sidebar-title .kicker {
+            color: var(--cyan);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .sidebar-title .title {
+            color: #f8fafc;
+            font-size: 19px;
+            font-weight: 780;
+            margin-top: 4px;
+        }
+
+        .sidebar-section {
+            margin: 16px 0 8px;
+            padding: 9px 11px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.50);
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 760;
+            text-transform: uppercase;
+        }
+
+        div[data-testid="stButton"] > button,
+        div[data-testid="stDownloadButton"] > button {
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(15, 23, 42, 0.72);
+            color: #e2e8f0;
             box-shadow: none;
-            font-weight: 600;
+            font-weight: 700;
+            transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+        }
+
+        div[data-testid="stButton"] > button:hover,
+        div[data-testid="stDownloadButton"] > button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(34, 211, 238, 0.52);
+            box-shadow: 0 0 30px rgba(34, 211, 238, 0.12);
+            background: rgba(30, 41, 59, 0.88);
+        }
+
+        div[data-testid="stButton"] > button[kind="primary"] {
+            border: 1px solid rgba(96, 165, 250, 0.72);
+            background: linear-gradient(135deg, #2563eb, #7c3aed 55%, #0891b2);
+            box-shadow: 0 0 36px rgba(96, 165, 250, 0.24);
         }
 
         .app-hero {
-            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.18);
             border-radius: 8px;
             background:
-                linear-gradient(135deg, rgba(255,255,255,0.98), rgba(247,250,252,0.96)),
-                linear-gradient(135deg, rgba(37,99,235,0.08), rgba(15,118,110,0.07));
+                linear-gradient(135deg, rgba(15, 23, 42, 0.84), rgba(2, 6, 23, 0.86)),
+                radial-gradient(circle at 78% 20%, rgba(34, 211, 238, 0.18), transparent 20rem),
+                radial-gradient(circle at 58% -20%, rgba(124, 58, 237, 0.22), transparent 24rem);
             box-shadow: var(--shadow);
-            padding: 28px 30px;
+            padding: 30px;
             margin-bottom: 18px;
         }
 
-        .hero-kicker {
-            color: var(--muted);
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 0.03em;
+        .app-hero::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(34, 211, 238, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 211, 238, 0.07) 1px, transparent 1px);
+            background-size: 36px 36px;
+            mask-image: linear-gradient(110deg, rgba(0,0,0,0.75), transparent 70%);
+        }
+
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+            gap: 24px;
+            align-items: stretch;
+        }
+
+        .hero-kicker, .section-kicker {
+            color: var(--cyan);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            margin-bottom: 8px;
         }
 
         .hero-title {
-            color: var(--text);
-            font-size: 34px;
-            line-height: 1.12;
-            font-weight: 760;
-            letter-spacing: 0;
-            margin: 0;
+            color: #f8fafc;
+            font-size: clamp(34px, 4vw, 54px);
+            line-height: 1.04;
+            font-weight: 820;
+            margin: 9px 0 0;
         }
 
         .hero-subtitle {
-            color: #374151;
+            color: #cbd5e1;
             font-size: 17px;
-            line-height: 1.55;
+            line-height: 1.62;
             max-width: 840px;
-            margin: 12px 0 0;
+            margin-top: 14px;
         }
 
         .hero-description {
-            color: var(--muted);
-            font-size: 14px;
-            line-height: 1.6;
-            max-width: 900px;
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.62;
             margin-top: 8px;
         }
 
+        .hero-orb {
+            position: absolute;
+            right: -80px;
+            top: -90px;
+            width: 260px;
+            height: 260px;
+            background: radial-gradient(circle, rgba(34, 211, 238, 0.22), transparent 65%);
+            filter: blur(2px);
+            opacity: 0.78;
+        }
+
         .status-row {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
-            margin-top: 20px;
+        }
+
+        .status-card, .metric-card, .soft-card, .solution-card, .step-item, .glass-card, .terminal-card {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
         }
 
         .status-card {
-            min-width: 170px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: rgba(255,255,255,0.78);
-            padding: 12px 14px;
+            padding: 13px 14px;
         }
 
         .status-label {
             color: var(--muted);
-            font-size: 12px;
-            line-height: 1.2;
+            font-size: 11px;
+            font-weight: 760;
+            text-transform: uppercase;
         }
 
         .status-value {
-            color: var(--text);
+            color: #f8fafc;
             font-size: 16px;
-            font-weight: 720;
-            line-height: 1.4;
-            margin-top: 4px;
+            font-weight: 780;
+            margin-top: 5px;
+        }
+
+        .agent-pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 20px;
+            align-items: center;
+        }
+
+        .pipeline-node {
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(34, 211, 238, 0.24);
+            background: rgba(8, 47, 73, 0.34);
+            color: #dff9ff;
+            font-size: 12px;
+            font-weight: 760;
+            box-shadow: 0 0 24px rgba(34, 211, 238, 0.08);
+        }
+
+        .pipeline-arrow {
+            color: rgba(148, 163, 184, 0.72);
+            font-size: 12px;
         }
 
         .metric-card, .soft-card, .solution-card {
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: var(--panel);
-            box-shadow: var(--shadow);
             padding: 16px;
             height: 100%;
         }
 
+        .metric-card {
+            position: relative;
+            min-height: 126px;
+        }
+
+        .metric-icon {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            min-width: 34px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid rgba(34, 211, 238, 0.20);
+            background: rgba(14, 165, 233, 0.10);
+            color: var(--cyan);
+            font-size: 11px;
+            font-weight: 850;
+        }
+
         .metric-label {
-            color: var(--muted);
+            color: #94a3b8;
             font-size: 12px;
-            font-weight: 650;
-            line-height: 1.2;
+            font-weight: 760;
+            text-transform: uppercase;
         }
 
         .metric-value {
-            color: var(--text);
-            font-size: 24px;
-            font-weight: 760;
-            line-height: 1.2;
-            margin-top: 8px;
+            color: #f8fafc;
+            font-size: 30px;
+            font-weight: 820;
+            line-height: 1.1;
+            margin-top: 11px;
             word-break: break-word;
         }
 
         .metric-caption {
-            color: var(--muted);
+            color: #94a3b8;
             font-size: 12px;
-            line-height: 1.45;
-            margin-top: 8px;
+            line-height: 1.5;
+            margin-top: 9px;
         }
 
         .section-title {
-            color: var(--text);
-            font-size: 18px;
-            font-weight: 760;
-            letter-spacing: 0;
-            margin: 8px 0 12px;
+            color: #f8fafc;
+            font-size: 22px;
+            font-weight: 800;
+            margin: 7px 0 4px;
+        }
+
+        .section-caption {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 0 0 14px;
         }
 
         .selected-card {
-            border-color: rgba(37, 99, 235, 0.45);
-            box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12), var(--shadow);
-            background: linear-gradient(180deg, #ffffff, #f8fbff);
+            border-color: rgba(34, 211, 238, 0.54);
+            box-shadow: var(--glow-cyan), var(--shadow);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.86), rgba(8, 47, 73, 0.42));
         }
 
         .card-title {
-            color: var(--text);
-            font-size: 15px;
-            font-weight: 730;
+            color: #f8fafc;
+            font-size: 16px;
+            font-weight: 790;
             line-height: 1.35;
             margin-bottom: 6px;
         }
 
         .card-text {
-            color: #374151;
+            color: #cbd5e1;
             font-size: 13px;
             line-height: 1.58;
+        }
+
+        .muted-line {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
         }
 
         .pill {
@@ -239,96 +423,256 @@ def inject_css() -> None:
             align-items: center;
             border-radius: 999px;
             padding: 4px 9px;
-            font-size: 12px;
-            font-weight: 650;
-            border: 1px solid var(--border);
-            background: #f9fafb;
-            color: #374151;
+            font-size: 11px;
+            font-weight: 760;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(15, 23, 42, 0.82);
+            color: #cbd5e1;
             margin: 0 6px 6px 0;
             white-space: nowrap;
+            text-transform: uppercase;
         }
 
         .pill-ok {
-            background: var(--teal-soft);
-            color: var(--teal);
-            border-color: #bbf7d0;
+            color: #bbf7d0;
+            border-color: rgba(52, 211, 153, 0.45);
+            background: rgba(6, 78, 59, 0.42);
+            box-shadow: 0 0 18px rgba(52, 211, 153, 0.11);
         }
 
         .pill-info {
-            background: var(--accent-soft);
-            color: var(--accent);
-            border-color: #bfdbfe;
+            color: #bae6fd;
+            border-color: rgba(34, 211, 238, 0.45);
+            background: rgba(8, 47, 73, 0.46);
+            box-shadow: 0 0 18px rgba(34, 211, 238, 0.12);
         }
 
         .pill-warn {
-            background: var(--amber-soft);
-            color: var(--amber);
-            border-color: #fde68a;
+            color: #fde68a;
+            border-color: rgba(251, 191, 36, 0.46);
+            background: rgba(113, 63, 18, 0.38);
         }
 
         .pill-danger {
-            background: var(--danger-soft);
-            color: var(--danger);
-            border-color: #fecaca;
+            color: #fecdd3;
+            border-color: rgba(251, 113, 133, 0.48);
+            background: rgba(127, 29, 29, 0.38);
+            box-shadow: 0 0 18px rgba(251, 113, 133, 0.10);
         }
 
         .step-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-            gap: 8px;
+            gap: 9px;
             margin: 8px 0 18px;
         }
 
         .step-item {
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #ffffff;
-            padding: 10px 11px;
-            min-height: 58px;
+            padding: 11px 12px;
+            min-height: 64px;
         }
 
         .step-done {
-            border-color: #bbf7d0;
-            background: #f8fffb;
+            border-color: rgba(34, 211, 238, 0.42);
+            box-shadow: 0 0 24px rgba(34, 211, 238, 0.11);
+        }
+
+        .step-pending {
+            border-color: rgba(148, 163, 184, 0.14);
+            background: rgba(15, 23, 42, 0.46);
+        }
+
+        .step-failed {
+            border-color: rgba(251, 113, 133, 0.48);
+            box-shadow: 0 0 24px rgba(251, 113, 133, 0.12);
         }
 
         .step-label {
-            color: var(--text);
+            color: #e2e8f0;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 790;
         }
 
         .step-status {
-            color: var(--muted);
+            color: #94a3b8;
             font-size: 12px;
             margin-top: 5px;
         }
 
         .empty-state {
-            border: 1px dashed var(--border-strong);
-            border-radius: 6px;
-            background: #ffffff;
+            border: 1px dashed rgba(34, 211, 238, 0.28);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.58);
             padding: 22px;
-            color: var(--muted);
+            color: #94a3b8;
             line-height: 1.65;
         }
 
+        .empty-state strong {
+            color: #e2e8f0;
+        }
+
+        .terminal-card {
+            padding: 0;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 13px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(2, 6, 23, 0.66);
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 780;
+        }
+
+        .terminal-body {
+            max-height: 340px;
+            overflow: auto;
+            padding: 13px;
+            background: rgba(2, 6, 23, 0.82);
+            color: #dbeafe;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            border-left: 3px solid rgba(34, 211, 238, 0.42);
+        }
+
+        .terminal-danger .terminal-body {
+            border-left-color: rgba(251, 113, 133, 0.78);
+            color: #fecdd3;
+        }
+
+        .terminal-ok .terminal-body {
+            border-left-color: rgba(52, 211, 153, 0.78);
+            color: #dcfce7;
+        }
+
         .code-list {
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #ffffff;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 8px;
+            background: rgba(2, 6, 23, 0.62);
             padding: 10px 12px;
             margin-bottom: 8px;
+            color: #cbd5e1;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 12px;
+        }
+
+        .mission-card {
+            border: 1px solid rgba(34, 211, 238, 0.18);
+            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.80), rgba(30, 41, 59, 0.50));
+            box-shadow: var(--shadow);
+            padding: 18px;
+            margin-top: 4px;
+        }
+
+        .mission-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .mission-item {
+            border-left: 1px solid rgba(34, 211, 238, 0.28);
+            padding-left: 12px;
+        }
+
+        .mission-label {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 760;
+            text-transform: uppercase;
+        }
+
+        .mission-value {
+            color: #f8fafc;
+            font-size: 14px;
+            font-weight: 760;
+            margin-top: 4px;
+            word-break: break-word;
+        }
+
+        .score-chip {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            min-width: 54px;
+            padding: 7px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(34, 211, 238, 0.36);
+            background: rgba(8, 47, 73, 0.58);
+            color: #e0f2fe;
+            text-align: center;
+            box-shadow: 0 0 22px rgba(34, 211, 238, 0.12);
+        }
+
+        .score-chip .num {
+            font-size: 21px;
+            line-height: 1;
+            font-weight: 850;
+        }
+
+        .score-chip .txt {
+            color: var(--muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        .candidate-card {
+            position: relative;
+            padding-right: 82px;
         }
 
         .small-divider {
             height: 1px;
-            background: var(--border);
+            background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.28), transparent);
             margin: 18px 0;
         }
 
         div[data-testid="stTabs"] button {
-            font-weight: 650;
+            color: #94a3b8;
+            font-weight: 720;
+            border-bottom: 1px solid transparent;
+        }
+
+        div[data-testid="stTabs"] button[aria-selected="true"] {
+            color: #e0f2fe;
+            border-bottom-color: var(--cyan);
+        }
+
+        div[data-testid="stMetric"] {
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.46);
+            padding: 10px;
+        }
+
+        div[data-testid="stExpander"] {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.50);
+        }
+
+        code, pre {
+            color: #dbeafe !important;
+        }
+
+        @media (max-width: 980px) {
+            .hero-grid, .mission-grid {
+                grid-template-columns: 1fr;
+            }
+            .status-row {
+                grid-template-columns: 1fr;
+            }
         }
         </style>
         """,
@@ -403,7 +747,8 @@ def load_json(path: Path, default: Any | None = None) -> Any:
         return fallback
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        st.warning(f"JSON 解析失败：{path.name} ({exc.msg})")
         return fallback
 
 
@@ -492,10 +837,28 @@ def pill(label: Any, tone: str = "neutral") -> str:
     return f'<span class="pill {tone_class}">{h(label)}</span>'
 
 
-def render_metric_card(label: str, value: Any, caption: str = "") -> None:
+def render_status_badge(label: Any, tone: str = "neutral") -> str:
+    return pill(label, tone)
+
+
+def render_section_header(kicker: str, title: str, caption: str = "") -> None:
+    st.markdown(
+        f"""
+        <div style="margin: 10px 0 16px;">
+            <div class="section-kicker">{h(kicker)}</div>
+            <div class="section-title">{h(title)}</div>
+            <div class="section-caption">{h(caption)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_metric_card(label: str, value: Any, caption: str = "", icon: str = "AI") -> None:
     st.markdown(
         f"""
         <div class="metric-card">
+            <div class="metric-icon">{h(icon)}</div>
             <div class="metric-label">{h(label)}</div>
             <div class="metric-value">{h(compact_number(value))}</div>
             <div class="metric-caption">{h(caption)}</div>
@@ -509,6 +872,7 @@ def render_empty_state(title: str, body: str) -> None:
     st.markdown(
         f"""
         <div class="empty-state">
+            {pill("Awaiting Agent Run", "info")}
             <strong>{h(title)}</strong><br/>
             {h(body)}
         </div>
@@ -531,35 +895,32 @@ def render_soft_card(title: str, body: str, tags: list[str] | None = None) -> No
     )
 
 
-def render_hero(provider: str, use_rag: bool, enable_reflection: bool) -> None:
+def render_terminal_block(title: str, content: str, tone: str = "neutral", meta: str = "") -> None:
+    tone_class = "terminal-ok" if tone == "ok" else "terminal-danger" if tone == "danger" else ""
+    safe_content = h(content or "(empty)")
     st.markdown(
         f"""
-        <div class="app-hero">
-            <div class="hero-kicker">CUMCM Auto-Solver Workbench</div>
-            <h1 class="hero-title">数学建模 Auto-Solver Agent</h1>
-            <div class="hero-subtitle">自动读题、建模、写代码、跑实验、生成报告。</div>
-            <div class="hero-description">
-                面向往年赛题复现、教学研究和 Agent 自动解题实验。页面只负责上传、配置、运行和查看中间产物，
-                核心求解仍由当前项目的 WorkflowRunner 串联完成。
+        <div class="terminal-card {tone_class}">
+            <div class="terminal-header">
+                <span>{h(title)}</span>
+                <span>{h(meta)}</span>
             </div>
-            <div class="status-row">
-                <div class="status-card">
-                    <div class="status-label">LLM Provider</div>
-                    <div class="status-value">{h(provider)}</div>
-                </div>
-                <div class="status-card">
-                    <div class="status-label">RAG</div>
-                    <div class="status-value">{h('已启用' if use_rag else '未启用')}</div>
-                </div>
-                <div class="status-card">
-                    <div class="status-label">Reflection Loop</div>
-                    <div class="status-value">{h('已启用' if enable_reflection else '未启用')}</div>
-                </div>
-            </div>
+            <div class="terminal-body">{safe_content}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_agent_pipeline() -> str:
+    nodes = ["Parse", "Model", "Code", "Execute", "Reflect", "Report"]
+    parts = ['<div class="agent-pipeline">']
+    for index, node in enumerate(nodes):
+        if index:
+            parts.append('<span class="pipeline-arrow">→</span>')
+        parts.append(f'<span class="pipeline-node">{h(node)}</span>')
+    parts.append("</div>")
+    return "".join(parts)
 
 
 def render_download_button(label: str, path: Path, file_name: str | None = None) -> None:
@@ -572,21 +933,84 @@ def render_download_button(label: str, path: Path, file_name: str | None = None)
         )
 
 
+def sidebar_section(label: str) -> None:
+    st.markdown(f'<div class="sidebar-section">{h(label)}</div>', unsafe_allow_html=True)
+
+
+def render_hero(provider: str, use_rag: bool, enable_reflection: bool) -> None:
+    report_ready = (REPORTS_DIR / "solution_report.md").exists()
+    report_tone = "ok" if report_ready else "warn"
+    st.markdown(
+        f"""
+        <div class="app-hero">
+            <div class="hero-orb"></div>
+            <div class="hero-grid">
+                <div>
+                    <div class="hero-kicker">CUMCM Autonomous Modeling Workbench</div>
+                    <h1 class="hero-title">数学建模 Auto-Solver Agent</h1>
+                    <div class="hero-subtitle">
+                        从题面解析、模型选择、代码执行到论文生成的一体化 Agent 工作台。
+                    </div>
+                    <div class="hero-description">
+                        面向往年赛题复现、教学研究和自动建模实验。当前页面仅负责交互与可视化，
+                        后端求解流程仍由项目内 WorkflowRunner 和模块化 Agent 串联完成。
+                    </div>
+                    {render_agent_pipeline()}
+                </div>
+                <div class="status-row">
+                    <div class="status-card">
+                        <div class="status-label">LLM Provider</div>
+                        <div class="status-value">{h(provider)}</div>
+                        {render_status_badge("Mock" if provider == "mock" else "Active", "info")}
+                    </div>
+                    <div class="status-card">
+                        <div class="status-label">RAG</div>
+                        <div class="status-value">{h("Enabled" if use_rag else "Standby")}</div>
+                        {render_status_badge("RAG ON" if use_rag else "RAG OFF", "ok" if use_rag else "warn")}
+                    </div>
+                    <div class="status-card">
+                        <div class="status-label">Reflection</div>
+                        <div class="status-value">{h("Enabled" if enable_reflection else "Disabled")}</div>
+                        {render_status_badge("Reflect ON" if enable_reflection else "Reflect OFF", "ok" if enable_reflection else "warn")}
+                    </div>
+                    <div class="status-card">
+                        <div class="status-label">Report Status</div>
+                        <div class="status-value">{h("Generated" if report_ready else "Awaiting")}</div>
+                        {render_status_badge("Completed" if report_ready else "Pending", report_tone)}
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_sidebar() -> dict[str, Any]:
     with st.sidebar:
-        st.markdown("## 项目设置")
+        st.markdown(
+            """
+            <div class="sidebar-title">
+                <div class="kicker">Mission Console</div>
+                <div class="title">Agent Control</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        sidebar_section("01 / Runtime")
         provider = st.selectbox(
             "LLM Provider",
             ["auto", "mock", "deepseek", "openai-compatible", "local-http"],
             index=0,
             help="真实 API key 只从环境变量读取；未配置时建议使用 mock。",
         )
-        use_rag = st.toggle("启用 RAG", value=False)
-        enable_reflection = st.toggle("启用 Reflection Loop", value=True)
-        export_docx = st.toggle("导出 Word", value=False)
-        export_pdf = st.toggle("尝试导出 PDF", value=False)
+        use_rag = st.toggle("RAG Retrieval", value=False)
+        enable_reflection = st.toggle("Reflection Loop", value=True)
+        export_docx = st.toggle("Export Word", value=False)
+        export_pdf = st.toggle("Export PDF", value=False)
 
-        st.markdown("## 文件上传")
+        sidebar_section("02 / Inputs")
         input_mode = st.radio("题目来源", ["示例题", "本地路径", "上传文件"], index=0)
         problem_path: Path | None = None
         data_path: Path | None = None
@@ -624,7 +1048,7 @@ def render_sidebar() -> dict[str, Any]:
                 for uploaded in data_uploads:
                     st.caption(f"数据：{uploaded.name}")
 
-        st.markdown("## 运行控制")
+        sidebar_section("03 / Execution")
         max_repairs = st.slider("自动修复次数", min_value=0, max_value=5, value=3)
         run_clicked = st.button("开始自动求解", type="primary", use_container_width=True)
 
@@ -641,7 +1065,7 @@ def render_sidebar() -> dict[str, Any]:
             if st.button("清空输出目录（保护模式）", use_container_width=True):
                 st.info(f"请在确认备份后手动清理：{OUTPUT_DIR}")
 
-        st.markdown("## 下载")
+        sidebar_section("04 / Artifacts")
         render_download_button("下载 Markdown 报告", REPORTS_DIR / "solution_report.md", "solution_report.md")
         render_download_button("下载 Word 报告", REPORTS_DIR / "solution_report.docx", "solution_report.docx")
         render_download_button("下载 PDF 报告", REPORTS_DIR / "solution_report.pdf", "solution_report.pdf")
@@ -715,7 +1139,7 @@ def run_workflow(config: dict[str, Any]) -> None:
 
 def workflow_completion(state: dict[str, Any]) -> tuple[int, int]:
     done = 0
-    for _, key in WORKFLOW_STEPS:
+    for _, key, _ in WORKFLOW_STEPS:
         if key == "file_loader":
             done += 1 if state.get("raw_problem") else 0
         elif state.get(key) not in (None, {}, []):
@@ -743,19 +1167,25 @@ def list_figures(figures_dir: Path) -> list[Path]:
 
 
 def render_progress_steps(state: dict[str, Any]) -> None:
+    execution_result = state.get("execution_result") or {}
     parts = ['<div class="step-grid">']
-    for label, key in WORKFLOW_STEPS:
+    for label, key, short_label in WORKFLOW_STEPS:
         if key == "file_loader":
             complete = bool(state.get("raw_problem"))
+            failed = False
+        elif key == "execution_result" and execution_result:
+            complete = True
+            failed = not bool(execution_result.get("success", False))
         else:
             complete = state.get(key) not in (None, {}, [])
-        css = "step-done" if complete else "step-pending"
-        status = "完成" if complete else "等待"
+            failed = False
+        css = "step-failed" if failed else "step-done" if complete else "step-pending"
+        status = "Failed" if failed else "Completed" if complete else "Standby"
         parts.append(
             f"""
             <div class="step-item {css}">
-                <div class="step-label">{h(label)}</div>
-                <div class="step-status">{h(status)}</div>
+                <div class="step-label">{h(short_label)}</div>
+                <div class="step-status">{h(label)} · {h(status)}</div>
             </div>
             """
         )
@@ -764,7 +1194,11 @@ def render_progress_steps(state: dict[str, Any]) -> None:
 
 
 def render_dashboard(state: dict[str, Any]) -> None:
-    st.markdown('<div class="section-title">运行总览</div>', unsafe_allow_html=True)
+    render_section_header(
+        "Agent Mission Control",
+        "运行总览",
+        "从输入、建模、执行到报告的实时控制台视图。",
+    )
     if not state:
         render_empty_state(
             "尚未发现运行结果",
@@ -786,34 +1220,52 @@ def render_dashboard(state: dict[str, Any]) -> None:
 
     cols = st.columns(6)
     with cols[0]:
-        render_metric_card("小问数量", count_questions(parsed_problem), "来自题目解析")
+        render_metric_card("小问数量", count_questions(parsed_problem), "来自题目解析", "Q")
     with cols[1]:
-        render_metric_card("数据文件", data_profile.get("file_count", 0), "CSV / XLSX")
+        render_metric_card("数据文件", data_profile.get("file_count", 0), "CSV / XLSX", "DATA")
     with cols[2]:
-        render_metric_card("候选模型", count_candidates(strategies), "Model Zoo 推荐")
+        render_metric_card("候选模型", count_candidates(strategies), "Model Zoo 推荐", "M")
     with cols[3]:
-        render_metric_card("图表数量", len(figures), "含数据画像图")
+        render_metric_card("图表数量", len(figures), "含数据画像图", "FIG")
     with cols[4]:
-        render_metric_card("代码执行", "成功" if execution_result.get("success") else "未成功", "最近一次执行")
+        render_metric_card("代码执行", "成功" if execution_result.get("success") else "未成功", "最近一次执行", "EXE")
     with cols[5]:
-        render_metric_card("报告", "已生成" if report_path.exists() else "未生成", "Markdown")
+        render_metric_card("报告", "已生成" if report_path.exists() else "未生成", "Markdown", "DOC")
 
-    st.markdown('<div class="small-divider"></div>', unsafe_allow_html=True)
     problem_name = Path(state.get("problem_path", "")).name if state.get("problem_path") else "未知题面"
     problem_type = parsed_problem.get("problem_type", "unknown")
     selected_model = get_section(state, "selected_model")
     selected_solution = selected_model.get("selected_solution", {})
     route = selected_solution.get("solution_name") or selected_model.get("overall_route", "尚未选择")
     data_used = data_profile.get("table_count", 0) > 0
-    cols = st.columns(4)
-    with cols[0]:
-        render_soft_card("题面文件", problem_name, [problem_type])
-    with cols[1]:
-        render_soft_card("最终路线", str(route), ["selected"])
-    with cols[2]:
-        render_soft_card("数据使用", "检测到结构化数据" if data_used else "未检测到结构化数据", ["data"])
-    with cols[3]:
-        render_soft_card("报告状态", "可在论文报告 Tab 查看和下载" if report_path.exists() else "尚未生成报告", ["report"])
+
+    st.markdown(
+        f"""
+        <div class="mission-card">
+            <div class="section-kicker">Latest Run Summary</div>
+            <div class="card-title">最近运行摘要</div>
+            <div class="mission-grid">
+                <div class="mission-item">
+                    <div class="mission-label">Problem File</div>
+                    <div class="mission-value">{h(problem_name)}</div>
+                </div>
+                <div class="mission-item">
+                    <div class="mission-label">Problem Type</div>
+                    <div class="mission-value">{h(problem_type)}</div>
+                </div>
+                <div class="mission-item">
+                    <div class="mission-label">Selected Route</div>
+                    <div class="mission-value">{h(route)}</div>
+                </div>
+                <div class="mission-item">
+                    <div class="mission-label">Data / Report</div>
+                    <div class="mission-value">{h('数据可用' if data_used else '无结构化数据')} · {h('报告已生成' if report_path.exists() else '报告待生成')}</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_problem_tab(state: dict[str, Any]) -> None:
@@ -822,7 +1274,7 @@ def render_problem_tab(state: dict[str, Any]) -> None:
         render_empty_state("暂无题目解析", "运行工作流后会在这里展示背景、小问、关键词和题型判断。")
         return
 
-    st.markdown('<div class="section-title">题目解析</div>', unsafe_allow_html=True)
+    render_section_header("Problem Intelligence", "题目解析", "结构化展示赛题背景、数据说明和小问列表。")
     tags = []
     for key in ("problem_type", "difficulty"):
         if parsed.get(key):
@@ -839,7 +1291,7 @@ def render_problem_tab(state: dict[str, Any]) -> None:
         render_soft_card("数据说明", parsed.get("data_description", "暂无数据说明。"))
 
     questions = as_list(parsed.get("questions"))
-    st.markdown('<div class="section-title">小问列表</div>', unsafe_allow_html=True)
+    render_section_header("Question Set", "小问列表", "")
     if not questions:
         render_empty_state("未识别到小问", "可以查看原始日志确认题面是否包含明确的问题编号。")
     for idx, question in enumerate(questions, start=1):
@@ -862,7 +1314,7 @@ def render_data_profile_tab(state: dict[str, Any]) -> None:
         render_empty_state("暂无数据画像", "没有数据文件或尚未运行工作流时，会跳过数据画像。")
         return
 
-    st.markdown('<div class="section-title">数据画像</div>', unsafe_allow_html=True)
+    render_section_header("Data Telemetry", "数据画像", "查看表结构、字段类型、缺失值和 EDA 图表。")
     for warning in profile.get("warnings", []):
         st.warning(warning)
 
@@ -875,13 +1327,13 @@ def render_data_profile_tab(state: dict[str, Any]) -> None:
 
     cols = st.columns(4)
     with cols[0]:
-        render_metric_card("数据文件", profile.get("file_count", 0), "原始文件数")
+        render_metric_card("数据文件", profile.get("file_count", 0), "原始文件数", "FILE")
     with cols[1]:
-        render_metric_card("数据表", profile.get("table_count", 0), "CSV 或工作表")
+        render_metric_card("数据表", profile.get("table_count", 0), "CSV 或工作表", "TAB")
     with cols[2]:
-        render_metric_card("数值字段", len(profile.get("summary", {}).get("numeric_columns", [])), "可用于建模")
+        render_metric_card("数值字段", len(profile.get("summary", {}).get("numeric_columns", [])), "可用于建模", "NUM")
     with cols[3]:
-        render_metric_card("类别字段", len(profile.get("summary", {}).get("categorical_columns", [])), "可用于分组")
+        render_metric_card("类别字段", len(profile.get("summary", {}).get("categorical_columns", [])), "可用于分组", "CAT")
 
     for item in files:
         with st.expander(item.get("file_name", "data table"), expanded=True):
@@ -925,20 +1377,25 @@ def candidate_score(candidate: dict[str, Any]) -> int:
 
 
 def render_candidate_card(candidate: dict[str, Any], selected: bool = False) -> None:
-    card_class = "solution-card selected-card" if selected else "solution-card"
+    card_class = "solution-card selected-card candidate-card" if selected else "solution-card candidate-card"
     risks = candidate.get("risks_and_limitations", [])[:3]
-    reqs = candidate.get("input_data_requirements", [])[:3]
+    reqs = candidate.get("input_data_requirements", [])[:2]
     score = candidate_score(candidate)
+    risk_tags = "".join(pill(risk, "warn") for risk in risks[:2])
     st.markdown(
         f"""
         <div class="{card_class}">
+            <div class="score-chip"><div class="num">{h(score)}</div><div class="txt">score</div></div>
             <div class="card-title">{h(candidate.get('name') or candidate.get('model_id') or 'candidate model')}</div>
-            <div>{pill(candidate.get('category', 'model'), 'info')}{pill(candidate.get('implementation_difficulty', 'medium'), 'warn')}{pill('score ' + str(score), 'ok' if selected else 'neutral')}</div>
+            <div>
+                {pill(candidate.get('category', 'model'), 'info')}
+                {pill(candidate.get('implementation_difficulty', 'medium'), 'warn')}
+                {pill('selected', 'ok') if selected else ''}
+            </div>
             <div class="card-text" style="margin-top:8px;">{h(candidate.get('why_suitable', '暂无适配说明。'))}</div>
-            <div class="card-text" style="margin-top:8px;"><strong>预期输出：</strong>{h(candidate.get('expected_output', '-'))}</div>
-            <div class="card-text"><strong>论文表达：</strong>{h(candidate.get('paper_expression_advantage', '-'))}</div>
-            <div class="card-text"><strong>输入要求：</strong>{h('; '.join(str(x) for x in reqs) or '-')}</div>
-            <div class="card-text"><strong>风险限制：</strong>{h('; '.join(str(x) for x in risks) or '-')}</div>
+            <div class="muted-line" style="margin-top:9px;"><strong>Output</strong> · {h(candidate.get('expected_output', '-'))}</div>
+            <div class="muted-line"><strong>Input</strong> · {h('; '.join(str(x) for x in reqs) or '-')}</div>
+            <div style="margin-top:9px;">{risk_tags or pill('No major risk listed', 'ok')}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -957,7 +1414,7 @@ def render_strategy_tab(state: dict[str, Any]) -> None:
         render_empty_state("暂无建模策略", "运行工作流后，Model Zoo 推荐和候选模型评分会显示在这里。")
         return
 
-    st.markdown('<div class="section-title">建模策略</div>', unsafe_allow_html=True)
+    render_section_header("Model Evaluation Matrix", "建模策略", "Model Zoo 推荐、候选模型评分与选中模型。")
     st.caption(f"推荐来源：{strategies.get('recommendation_source', 'unknown')}")
     for group in strategies.get("strategies", []):
         st.markdown(f"#### 任务 {group.get('task_id', '-')}: {group.get('task_description', '')}")
@@ -988,24 +1445,25 @@ def render_solution_competition_tab(state: dict[str, Any]) -> None:
         render_empty_state("暂无多方案比较", "运行工作流后会展示 conservative / advanced / hybrid 三套完整方案。")
         return
 
-    st.markdown('<div class="section-title">建模方案比较与选择</div>', unsafe_allow_html=True)
+    render_section_header("Solution Arena", "建模方案比较与选择", "比较保守、增强和混合方案，突出最终得分最高路线。")
     selected_name = (competition.get("selected_solution") or {}).get("solution_name")
     solutions = competition.get("candidate_solutions", [])
     columns = st.columns(min(3, max(1, len(solutions))))
     for idx, solution in enumerate(solutions):
         selected = solution.get("solution_name") == selected_name
-        card_class = "solution-card selected-card" if selected else "solution-card"
+        card_class = "solution-card selected-card candidate-card" if selected else "solution-card candidate-card"
         score = solution.get("score", {}).get("total_score", "-")
+        risks = solution.get("risk_points", [])[:3]
         with columns[idx % len(columns)]:
             st.markdown(
                 f"""
                 <div class="{card_class}">
+                    <div class="score-chip"><div class="num">{h(score)}</div><div class="txt">total</div></div>
                     <div class="card-title">{h(solution.get('solution_name'))}</div>
-                    <div>{pill('selected', 'ok') if selected else pill('candidate', 'neutral')}{pill('score ' + str(score), 'info')}</div>
+                    <div>{pill('selected', 'ok') if selected else pill('candidate', 'neutral')}{pill(solution.get('implementation_difficulty', '-'), 'warn')}</div>
                     <div class="card-text" style="margin-top:8px;">{h(solution.get('overall_idea', ''))}</div>
-                    <div class="card-text" style="margin-top:8px;"><strong>难度：</strong>{h(solution.get('implementation_difficulty', '-'))}</div>
-                    <div class="card-text"><strong>论文叙事：</strong>{h(solution.get('paper_narrative', '-'))}</div>
-                    <div class="card-text"><strong>主要风险：</strong>{h('; '.join(solution.get('risk_points', [])[:3]) or '-')}</div>
+                    <div class="muted-line" style="margin-top:9px;"><strong>Narrative</strong> · {h(solution.get('paper_narrative', '-'))}</div>
+                    <div style="margin-top:9px;">{''.join(pill(risk, 'warn') for risk in risks) or pill('No major risk listed', 'ok')}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1026,7 +1484,7 @@ def render_formula_figure_tab(state: dict[str, Any]) -> None:
     figures_dir = get_output_path(state, "figures_dir", FIGURES_DIR)
     figures = list_figures(figures_dir)
 
-    st.markdown('<div class="section-title">公式与图表</div>', unsafe_allow_html=True)
+    render_section_header("Formula And Figure Lab", "公式与图表", "符号说明、模型公式、图表规划和生成图像。")
     if not formulas and not figure_plan and not figures:
         render_empty_state("暂无公式与图表", "公式、图表规划和生成图片会在工作流完成后显示。")
         return
@@ -1091,7 +1549,7 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
     code_dir = get_output_path(state, "code_dir", CODE_DIR)
     code_files = sorted(path for path in code_dir.rglob("*") if path.is_file()) if code_dir.exists() else []
 
-    st.markdown('<div class="section-title">代码执行</div>', unsafe_allow_html=True)
+    render_section_header("Execution Console", "代码执行", "查看执行状态、修复尝试、stdout / stderr 和生成文件。")
     if not attempts and not execution_result and not code_files:
         render_empty_state("暂无代码执行结果", "工作流执行后会展示 stdout、stderr、修复尝试和生成文件。")
         return
@@ -1101,28 +1559,27 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
     final_returncode = execution_result.get("returncode", "-") if isinstance(execution_result, dict) else "-"
     cols = st.columns(4)
     with cols[0]:
-        render_metric_card("执行状态", "成功" if success else "失败或未完成", "最终状态")
+        render_metric_card("执行状态", "Success" if success else "Failed", "最终状态", "RUN")
     with cols[1]:
-        render_metric_card("尝试次数", len(attempt_list), "含初始执行")
+        render_metric_card("Attempts", len(attempt_list), "含初始执行", "TRY")
     with cols[2]:
-        render_metric_card("Return code", final_returncode, "最终返回码")
+        render_metric_card("Return Code", final_returncode, "最终返回码", "RC")
     with cols[3]:
-        render_metric_card("代码文件", len(code_files), "outputs/code")
+        render_metric_card("Generated Files", len(code_files), "outputs/code", "OUT")
 
     if attempt_list:
         for attempt in attempt_list:
             if not isinstance(attempt, dict):
                 continue
-            label = f"Attempt {attempt.get('attempt', '-')}: {'success' if attempt.get('success') else 'failed'}"
-            with st.expander(label, expanded=not attempt.get("success")):
+            ok = bool(attempt.get("success"))
+            label = f"Attempt {attempt.get('attempt', '-')}: {'success' if ok else 'failed'}"
+            with st.expander(label, expanded=not ok):
                 repair = attempt.get("repair")
                 if repair:
                     st.write("修复说明")
                     st.json(repair)
-                st.write("stdout")
-                st.code(attempt.get("stdout", "") or "(empty)", language="text")
-                st.write("stderr")
-                st.code(attempt.get("stderr", "") or "(empty)", language="text")
+                render_terminal_block("stdout", attempt.get("stdout", "") or "(empty)", "ok" if ok else "neutral")
+                render_terminal_block("stderr", attempt.get("stderr", "") or "(empty)", "danger" if not ok else "neutral")
                 generated_files = attempt.get("generated_files", [])
                 if generated_files:
                     st.write("生成文件")
@@ -1132,7 +1589,7 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
     if code_files:
         for idx, file_path in enumerate(code_files):
             rel = file_path.relative_to(code_dir).as_posix()
-            st.markdown(f'<div class="code-list"><strong>{h(rel)}</strong></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="code-list">{h(rel)}</div>', unsafe_allow_html=True)
             st.download_button(
                 f"下载 {file_path.name}",
                 file_path.read_bytes(),
@@ -1141,7 +1598,7 @@ def render_code_execution_tab(state: dict[str, Any]) -> None:
             )
             if file_path.suffix.lower() == ".py":
                 with st.expander(f"查看 {file_path.name}"):
-                    st.code(read_text(file_path, 40000), language="python")
+                    render_terminal_block(file_path.name, read_text(file_path, 40000), "neutral")
     else:
         st.caption("没有发现代码文件。")
 
@@ -1152,7 +1609,7 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
         render_empty_state("暂无反思结果", "Reflection Loop 未启用或尚未运行时，这里会保持为空。")
         return
 
-    st.markdown('<div class="section-title">反思与修订</div>', unsafe_allow_html=True)
+    render_section_header("Reflection Matrix", "反思与修订", "质量评分、检出问题和修订建议。")
     score_keys = [
         ("completeness_score", "完整性"),
         ("question_alignment_score", "题目贴合"),
@@ -1164,7 +1621,7 @@ def render_reflection_tab(state: dict[str, Any]) -> None:
     for idx, (key, label) in enumerate(score_keys):
         value = reflection.get(key, 0)
         with cols[idx]:
-            render_metric_card(label, value, "0-100 或 0-5 评分")
+            render_metric_card(label, value, "0-100 或 0-5 评分", f"S{idx + 1}")
             try:
                 numeric = float(value)
                 st.progress(min(numeric / 100 if numeric > 5 else numeric / 5, 1.0))
@@ -1206,7 +1663,7 @@ def render_report_tab(state: dict[str, Any]) -> None:
     docx_path = REPORTS_DIR / "solution_report.docx"
     pdf_path = REPORTS_DIR / "solution_report.pdf"
 
-    st.markdown('<div class="section-title">论文报告</div>', unsafe_allow_html=True)
+    render_section_header("Paper Output", "论文报告", "Markdown 报告预览和导出入口。")
     if not report_path.exists():
         render_empty_state("暂无 Markdown 报告", "运行完整工作流后会生成 outputs/reports/solution_report.md。")
         return
@@ -1224,7 +1681,7 @@ def render_report_tab(state: dict[str, Any]) -> None:
 
 
 def render_logs_tab(_: dict[str, Any]) -> None:
-    st.markdown('<div class="section-title">运行日志</div>', unsafe_allow_html=True)
+    render_section_header("Log Observatory", "运行日志", "左侧选择日志文件，右侧查看结构化内容。")
     if not LOGS_DIR.exists():
         render_empty_state("暂无日志目录", "运行后日志会保存在 outputs/logs。")
         return
@@ -1234,18 +1691,37 @@ def render_logs_tab(_: dict[str, Any]) -> None:
         render_empty_state("暂无日志文件", "运行后会展示 JSON、JSONL 等日志文件。")
         return
 
-    col1, col2 = st.columns([0.45, 0.55])
+    col1, col2 = st.columns([0.38, 0.62])
     with col1:
         selected_name = st.selectbox("日志文件", [path.name for path in log_files])
         selected_path = LOGS_DIR / selected_name
+        modified = datetime.fromtimestamp(selected_path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        st.markdown(
+            f"""
+            <div class="glass-card" style="padding:14px;">
+                <div class="card-title">{h(selected_name)}</div>
+                {pill(str(selected_path.stat().st_size) + " bytes", "info")}
+                {pill(modified, "neutral")}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         st.download_button(
             f"下载 {selected_name}",
             selected_path.read_bytes(),
             file_name=selected_name,
             use_container_width=True,
         )
-        st.caption(f"文件大小：{selected_path.stat().st_size} bytes")
     with col2:
+        st.markdown(
+            f"""
+            <div class="glass-card" style="padding:14px; margin-bottom:10px;">
+                <div class="section-kicker">Log Payload</div>
+                <div class="card-title">{h(selected_name)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         if selected_path.suffix == ".json":
             st.json(load_json(selected_path, {}))
         elif selected_path.suffix == ".jsonl":
@@ -1259,7 +1735,7 @@ def render_logs_tab(_: dict[str, Any]) -> None:
                     preview.append({"raw": line})
             st.json(preview)
         else:
-            st.code(read_text(selected_path, 60000), language="text")
+            render_terminal_block(selected_name, read_text(selected_path, 60000), "neutral")
 
 
 def main() -> None:
