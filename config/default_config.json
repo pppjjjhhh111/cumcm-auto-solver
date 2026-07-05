@@ -1,0 +1,16 @@
+{
+  "llm_backend": "auto",
+  "deepseek": {
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-flash",
+    "api_key_env": "DEEPSEEK_API_KEY"
+  },
+  "max_repair_attempts": 3,
+  "executor_timeout_seconds": 60,
+  "outputs": {
+    "code": "outputs/code",
+    "figures": "outputs/figures",
+    "logs": "outputs/logs",
+    "reports": "outputs/reports"
+  }
+}

@@ -1,0 +1,2 @@
+"""CUMCM Auto Solver package."""
+

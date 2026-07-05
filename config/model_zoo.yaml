@@ -1,0 +1,722 @@
+prediction:
+  - id: linear_regression
+    name: Linear Regression
+    category: prediction
+    suitable_for:
+      - numeric prediction with interpretable linear relationships
+      - baseline demand or score forecasting
+    input_requirements:
+      - tabular numeric features
+      - numeric target variable
+      - enough rows for simple train/test validation
+    output_type: coefficients, fitted values, predictions, residual diagnostics
+    advantages:
+      - easy to implement and explain
+      - strong baseline for papers
+      - supports coefficient interpretation
+    limitations:
+      - weak for nonlinear relationships
+      - sensitive to outliers and multicollinearity
+    typical_workflow:
+      - clean numeric variables
+      - split features and target
+      - fit ordinary least squares
+      - check residuals and forecast
+    python_libraries:
+      - sklearn
+      - statsmodels
+      - numpy
+    paper_expression_template: "Build y = beta0 + beta1*x1 + ... + betak*xk, estimate coefficients, and discuss factor influence by coefficient signs and residual error."
+  - id: polynomial_regression
+    name: Polynomial Regression
+    category: prediction
+    suitable_for:
+      - nonlinear trend fitting
+      - curved relationship between one or more variables and target
+    input_requirements:
+      - numeric features
+      - numeric target
+      - polynomial degree selected by validation
+    output_type: polynomial equation, predictions, fitting error
+    advantages:
+      - captures simple nonlinear patterns
+      - remains more interpretable than black-box models
+    limitations:
+      - can overfit high-degree terms
+      - extrapolation is unstable
+    typical_workflow:
+      - generate polynomial features
+      - fit linear model on expanded features
+      - compare degree by validation error
+    python_libraries:
+      - sklearn
+      - numpy
+    paper_expression_template: "Expand variables to polynomial terms, fit the transformed regression model, and select degree using error comparison."
+  - id: random_forest
+    name: Random Forest Regressor
+    category: prediction
+    suitable_for:
+      - nonlinear tabular prediction
+      - mixed feature effects and interactions
+    input_requirements:
+      - tabular features
+      - numeric target
+      - sufficient sample size
+    output_type: predictions, feature importance, validation error
+    advantages:
+      - robust to nonlinear relationships
+      - handles feature interactions
+      - useful feature importance output
+    limitations:
+      - less transparent than regression
+      - requires more data and tuning
+    typical_workflow:
+      - preprocess numeric and categorical features
+      - train random forest
+      - evaluate validation error
+      - analyze feature importance
+    python_libraries:
+      - sklearn
+    paper_expression_template: "Use an ensemble of decision trees to model nonlinear effects, then explain key drivers through feature importance and validation metrics."
+  - id: gradient_boosting
+    name: Gradient Boosting Regressor
+    category: prediction
+    suitable_for:
+      - high-accuracy tabular prediction
+      - nonlinear demand or risk forecasting
+    input_requirements:
+      - tabular features
+      - numeric target
+      - validation set for tuning
+    output_type: predictions, validation error, feature importance
+    advantages:
+      - strong predictive performance
+      - captures nonlinear interactions
+    limitations:
+      - more tuning-sensitive
+      - weaker paper interpretability than linear models
+    typical_workflow:
+      - clean features
+      - train boosting model
+      - tune learning rate and tree depth
+      - evaluate validation metrics
+    python_libraries:
+      - sklearn
+    paper_expression_template: "Iteratively fit weak learners to residuals and report predictive performance with feature importance as supporting explanation."
+  - id: arima
+    name: ARIMA
+    category: prediction
+    suitable_for:
+      - univariate time series forecasting
+      - short-term trend and seasonality analysis
+    input_requirements:
+      - ordered time series
+      - stationarity check or differencing
+      - enough historical observations
+    output_type: time series forecast, confidence interval, residual diagnostics
+    advantages:
+      - standard time series method
+      - clear statistical interpretation
+    limitations:
+      - weak with multiple external drivers
+      - needs stationarity handling
+    typical_workflow:
+      - sort by time
+      - test stationarity
+      - select p d q
+      - fit and forecast
+    python_libraries:
+      - statsmodels
+      - pandas
+    paper_expression_template: "Transform the sequence to stationarity, identify ARIMA(p,d,q), and generate short-term forecasts with residual diagnostics."
+  - id: grey_prediction_GM11
+    name: Grey Prediction GM(1,1)
+    category: prediction
+    suitable_for:
+      - small-sample trend prediction
+      - limited historical data with monotonic trend
+    input_requirements:
+      - positive ordered numeric sequence
+      - small sample accepted
+      - weak random fluctuations
+    output_type: fitted sequence, forecast sequence, posterior error ratio
+    advantages:
+      - suitable for small data
+      - simple equations for modeling papers
+    limitations:
+      - assumes smooth exponential-like trend
+      - poor for volatile series
+    typical_workflow:
+      - accumulate original sequence
+      - estimate grey differential equation
+      - restore predicted values
+      - evaluate posterior error
+    python_libraries:
+      - numpy
+    paper_expression_template: "Apply accumulated generation, estimate GM(1,1) parameters, restore predicted sequence, and evaluate prediction accuracy."
+optimization:
+  - id: linear_programming
+    name: Linear Programming
+    category: optimization
+    suitable_for:
+      - resource allocation
+      - cost minimization or benefit maximization with linear constraints
+    input_requirements:
+      - linear objective
+      - linear constraints
+      - continuous decision variables
+    output_type: optimal decision variables, objective value, constraint status
+    advantages:
+      - mature solvers
+      - strong mathematical expression
+    limitations:
+      - requires linear approximation
+      - cannot directly handle integer decisions
+    typical_workflow:
+      - define variables
+      - build objective
+      - build constraints
+      - solve and analyze sensitivity
+    python_libraries:
+      - scipy
+      - pulp
+    paper_expression_template: "Define decision variables, formulate a linear objective and constraints, then solve for the optimal allocation scheme."
+  - id: integer_programming
+    name: Integer Programming
+    category: optimization
+    suitable_for:
+      - selection and scheduling problems
+      - discrete allocation
+    input_requirements:
+      - integer or binary variables
+      - objective function
+      - constraints
+    output_type: selected decisions, objective value, feasibility status
+    advantages:
+      - handles discrete choices directly
+      - clear decision interpretation
+    limitations:
+      - can be computationally expensive
+      - solver dependency is stronger
+    typical_workflow:
+      - define binary or integer variables
+      - encode constraints
+      - solve with branch-and-bound solver
+    python_libraries:
+      - pulp
+      - scipy
+    paper_expression_template: "Represent discrete decisions with integer variables and solve the constrained optimization model to obtain a feasible optimal plan."
+  - id: nonlinear_programming
+    name: Nonlinear Programming
+    category: optimization
+    suitable_for:
+      - nonlinear objective or constraints
+      - continuous parameter optimization
+    input_requirements:
+      - differentiable or computable objective
+      - constraints and bounds
+      - initial values
+    output_type: local optimum, objective value, convergence status
+    advantages:
+      - flexible objective functions
+      - can model realistic nonlinear effects
+    limitations:
+      - local optima risk
+      - sensitive to initialization
+    typical_workflow:
+      - define nonlinear objective
+      - set bounds and constraints
+      - run numerical optimizer
+      - verify convergence
+    python_libraries:
+      - scipy
+      - numpy
+    paper_expression_template: "Build a nonlinear objective with constraints, use numerical optimization, and verify the stability of the obtained local optimum."
+  - id: genetic_algorithm
+    name: Genetic Algorithm
+    category: optimization
+    suitable_for:
+      - complex search spaces
+      - combinatorial or black-box optimization
+    input_requirements:
+      - encoded candidate solution
+      - fitness function
+      - search bounds or constraints
+    output_type: near-optimal solution, fitness curve
+    advantages:
+      - flexible and global-search oriented
+      - does not require gradients
+    limitations:
+      - stochastic results
+      - parameter tuning needed
+    typical_workflow:
+      - encode chromosome
+      - define fitness
+      - perform selection crossover mutation
+      - report best solution
+    python_libraries:
+      - numpy
+      - deap
+    paper_expression_template: "Encode candidate decisions as chromosomes, define fitness, and use evolutionary operations to search for a high-quality feasible solution."
+  - id: simulated_annealing
+    name: Simulated Annealing
+    category: optimization
+    suitable_for:
+      - combinatorial optimization
+      - escaping local optima
+    input_requirements:
+      - initial feasible solution
+      - neighborhood operation
+      - objective function
+    output_type: near-optimal solution, objective trajectory
+    advantages:
+      - simple global-search heuristic
+      - works with many objective shapes
+    limitations:
+      - cooling schedule sensitive
+      - no strict optimality guarantee
+    typical_workflow:
+      - initialize solution
+      - generate neighbor
+      - accept by temperature rule
+      - cool until stopping criterion
+    python_libraries:
+      - numpy
+    paper_expression_template: "Use temperature-controlled random search to accept improving and occasional worsening moves, reducing the risk of local optimum trapping."
+evaluation:
+  - id: entropy_weight
+    name: Entropy Weight Method
+    category: evaluation
+    suitable_for:
+      - objective indicator weighting
+      - multi-index evaluation
+    input_requirements:
+      - indicator matrix
+      - indicator direction
+      - comparable samples
+    output_type: indicator weights, composite scores
+    advantages:
+      - data-driven weights
+      - easy to combine with TOPSIS
+    limitations:
+      - ignores expert preference
+      - sensitive to indicator scaling
+    typical_workflow:
+      - normalize indicators
+      - compute entropy
+      - derive weights
+      - calculate scores
+    python_libraries:
+      - numpy
+      - pandas
+    paper_expression_template: "Normalize indicators, compute information entropy, derive objective weights, and obtain comprehensive evaluation scores."
+  - id: topsis
+    name: TOPSIS
+    category: evaluation
+    suitable_for:
+      - ranking alternatives
+      - multi-criteria decision analysis
+    input_requirements:
+      - normalized indicator matrix
+      - weights
+      - positive and negative indicator directions
+    output_type: closeness coefficients, rankings
+    advantages:
+      - clear ideal-solution logic
+      - highly reportable
+    limitations:
+      - ranking depends on normalization and weights
+      - assumes indicators are comparable
+    typical_workflow:
+      - normalize data
+      - apply weights
+      - compute distances to ideal and negative ideal
+      - rank closeness
+    python_libraries:
+      - numpy
+      - pandas
+    paper_expression_template: "Compare each alternative with the positive and negative ideal solutions, then rank alternatives by relative closeness."
+  - id: ahp
+    name: Analytic Hierarchy Process
+    category: evaluation
+    suitable_for:
+      - expert-driven weighting
+      - hierarchical indicator systems
+    input_requirements:
+      - hierarchy structure
+      - pairwise comparison matrix
+      - consistency check
+    output_type: subjective weights, consistency ratio
+    advantages:
+      - incorporates expert judgment
+      - clear hierarchy for paper writing
+    limitations:
+      - subjective comparisons
+      - consistency can fail
+    typical_workflow:
+      - build hierarchy
+      - construct pairwise matrix
+      - compute eigenvector weights
+      - check consistency ratio
+    python_libraries:
+      - numpy
+    paper_expression_template: "Construct a hierarchical index system, derive weights from pairwise comparisons, and verify judgment consistency."
+  - id: pca
+    name: Principal Component Analysis
+    category: evaluation
+    suitable_for:
+      - dimension reduction
+      - composite score from correlated indicators
+    input_requirements:
+      - numeric indicator matrix
+      - standardized variables
+      - enough samples
+    output_type: principal components, explained variance, component scores
+    advantages:
+      - reduces correlated indicators
+      - objective transformation
+    limitations:
+      - component interpretation can be weak
+      - requires numeric variables
+    typical_workflow:
+      - standardize indicators
+      - compute covariance or correlation matrix
+      - extract components
+      - calculate scores
+    python_libraries:
+      - sklearn
+      - numpy
+      - pandas
+    paper_expression_template: "Use principal components to explain most variance with fewer dimensions, then build composite scores from component contributions."
+  - id: fuzzy_evaluation
+    name: Fuzzy Comprehensive Evaluation
+    category: evaluation
+    suitable_for:
+      - qualitative and uncertain evaluation
+      - membership-based rating
+    input_requirements:
+      - evaluation factors
+      - membership matrix
+      - factor weights
+    output_type: membership vector, final grade
+    advantages:
+      - handles vague qualitative judgments
+      - expressive for evaluation papers
+    limitations:
+      - membership function design is subjective
+      - needs clear grade set
+    typical_workflow:
+      - define factor and grade sets
+      - construct membership matrix
+      - set weights
+      - aggregate fuzzy result
+    python_libraries:
+      - numpy
+    paper_expression_template: "Define factor and evaluation grade sets, construct membership degrees, and aggregate by weights to obtain the final fuzzy evaluation."
+classification:
+  - id: kmeans
+    name: K-Means Clustering
+    category: classification
+    suitable_for:
+      - unsupervised grouping
+      - customer, region, or sample segmentation
+    input_requirements:
+      - numeric feature matrix
+      - chosen number of clusters
+      - scaled variables
+    output_type: cluster labels, cluster centers, within-cluster variance
+    advantages:
+      - simple and fast
+      - easy cluster center interpretation
+    limitations:
+      - requires k
+      - sensitive to scaling and outliers
+    typical_workflow:
+      - scale features
+      - select k
+      - fit clusters
+      - interpret cluster centers
+    python_libraries:
+      - sklearn
+      - numpy
+    paper_expression_template: "Cluster samples by feature similarity, determine representative cluster centers, and interpret each group profile."
+  - id: dbscan
+    name: DBSCAN
+    category: classification
+    suitable_for:
+      - density-based clustering
+      - outlier discovery
+    input_requirements:
+      - numeric feature matrix
+      - eps and min_samples
+      - scaled distance features
+    output_type: cluster labels, noise points
+    advantages:
+      - finds arbitrary cluster shapes
+      - identifies noise
+    limitations:
+      - parameter-sensitive
+      - weak for varying densities
+    typical_workflow:
+      - scale features
+      - choose eps and min_samples
+      - fit DBSCAN
+      - analyze clusters and noise
+    python_libraries:
+      - sklearn
+    paper_expression_template: "Use density connectivity to identify natural groups and noise points without pre-setting the number of clusters."
+  - id: svm
+    name: Support Vector Machine
+    category: classification
+    suitable_for:
+      - supervised classification
+      - small to medium feature datasets
+    input_requirements:
+      - labeled samples
+      - numeric features
+      - scaled variables
+    output_type: class labels, decision scores, accuracy metrics
+    advantages:
+      - strong margin-based classifier
+      - kernel supports nonlinear boundaries
+    limitations:
+      - needs labeled data
+      - parameter and kernel selection matters
+    typical_workflow:
+      - split labeled data
+      - scale features
+      - train SVM
+      - evaluate classification metrics
+    python_libraries:
+      - sklearn
+    paper_expression_template: "Construct a maximum-margin classifier and evaluate classification accuracy, explaining the selected kernel and parameters."
+  - id: random_forest_classifier
+    name: Random Forest Classifier
+    category: classification
+    suitable_for:
+      - supervised tabular classification
+      - nonlinear class boundaries
+    input_requirements:
+      - labeled tabular data
+      - features and target class
+      - validation split
+    output_type: class labels, probabilities, feature importance
+    advantages:
+      - robust nonlinear classifier
+      - feature importance supports explanation
+    limitations:
+      - less transparent than single trees
+      - needs enough labeled samples
+    typical_workflow:
+      - preprocess features
+      - train random forest classifier
+      - evaluate accuracy and confusion matrix
+      - report feature importance
+    python_libraries:
+      - sklearn
+    paper_expression_template: "Train an ensemble classifier and use validation metrics plus feature importance to explain classification performance."
+network:
+  - id: shortest_path
+    name: Shortest Path
+    category: network
+    suitable_for:
+      - route planning
+      - minimum distance or time path
+    input_requirements:
+      - graph nodes and edges
+      - edge weights
+      - source and target nodes
+    output_type: path, total cost, edge sequence
+    advantages:
+      - standard network model
+      - efficient algorithms
+    limitations:
+      - requires reliable edge weights
+      - single-objective unless extended
+    typical_workflow:
+      - build weighted graph
+      - choose source and target
+      - run shortest path algorithm
+      - analyze route cost
+    python_libraries:
+      - networkx
+    paper_expression_template: "Model the system as a weighted graph and use shortest-path algorithms to obtain the minimum-cost route."
+  - id: max_flow
+    name: Maximum Flow
+    category: network
+    suitable_for:
+      - capacity allocation
+      - transport or pipeline throughput
+    input_requirements:
+      - directed graph
+      - edge capacities
+      - source and sink
+    output_type: maximum flow value, edge flows
+    advantages:
+      - clear capacity interpretation
+      - mature algorithms
+    limitations:
+      - assumes known capacities
+      - single commodity by default
+    typical_workflow:
+      - build capacity graph
+      - define source and sink
+      - compute max flow
+      - inspect bottleneck edges
+    python_libraries:
+      - networkx
+    paper_expression_template: "Represent capacities on directed edges and compute the maximum feasible flow from source to sink."
+  - id: min_cost_flow
+    name: Minimum Cost Flow
+    category: network
+    suitable_for:
+      - logistics allocation
+      - transport with capacity and cost
+    input_requirements:
+      - directed graph
+      - capacities and costs
+      - supply and demand nodes
+    output_type: flow plan, total cost
+    advantages:
+      - combines capacity and cost
+      - strong logistics expression
+    limitations:
+      - requires structured network data
+      - solver setup can be complex
+    typical_workflow:
+      - build supply-demand network
+      - assign capacity and unit cost
+      - solve min-cost flow
+      - report allocation plan
+    python_libraries:
+      - networkx
+    paper_expression_template: "Build a capacity-cost network and find the feasible flow plan with minimum total transportation cost."
+  - id: pagerank
+    name: PageRank
+    category: network
+    suitable_for:
+      - node importance ranking
+      - directed relation networks
+    input_requirements:
+      - graph links
+      - damping factor
+      - connected or weakly connected network
+    output_type: node importance scores, rankings
+    advantages:
+      - robust centrality measure
+      - useful ranking interpretation
+    limitations:
+      - depends on link structure
+      - less suitable for non-network data
+    typical_workflow:
+      - build directed graph
+      - set damping factor
+      - compute PageRank scores
+      - rank nodes
+    python_libraries:
+      - networkx
+    paper_expression_template: "Evaluate node importance by iterative influence propagation over the directed network."
+  - id: community_detection
+    name: Community Detection
+    category: network
+    suitable_for:
+      - network clustering
+      - group discovery in relation data
+    input_requirements:
+      - graph edges
+      - optional edge weights
+      - community resolution parameter
+    output_type: community labels, modularity score
+    advantages:
+      - reveals network structure
+      - supports visual analysis
+    limitations:
+      - algorithm-dependent groups
+      - needs meaningful relation data
+    typical_workflow:
+      - build graph
+      - run community detection
+      - compute modularity
+      - interpret communities
+    python_libraries:
+      - networkx
+    paper_expression_template: "Detect communities by dense internal links and sparse external links, then interpret each group as a network substructure."
+simulation:
+  - id: monte_carlo
+    name: Monte Carlo Simulation
+    category: simulation
+    suitable_for:
+      - uncertainty propagation
+      - risk and probability estimation
+    input_requirements:
+      - random variable distributions
+      - simulation model
+      - number of trials
+    output_type: simulated distribution, probability estimates, confidence intervals
+    advantages:
+      - handles uncertainty naturally
+      - easy scenario analysis
+    limitations:
+      - depends on assumed distributions
+      - many trials can be costly
+    typical_workflow:
+      - define random variables
+      - sample repeated trials
+      - compute target metric
+      - summarize distribution
+    python_libraries:
+      - numpy
+      - scipy
+    paper_expression_template: "Define uncertain parameters, repeatedly sample scenarios, and estimate the distribution of the target outcome."
+  - id: cellular_automata
+    name: Cellular Automata
+    category: simulation
+    suitable_for:
+      - spatial diffusion
+      - grid-based dynamic evolution
+    input_requirements:
+      - grid state
+      - neighborhood rules
+      - time steps
+    output_type: state evolution, spatial patterns
+    advantages:
+      - intuitive spatial dynamics
+      - suitable for visualization
+    limitations:
+      - rule design is subjective
+      - calibration can be difficult
+    typical_workflow:
+      - define grid and states
+      - specify transition rules
+      - iterate time steps
+      - visualize evolution
+    python_libraries:
+      - numpy
+      - matplotlib
+    paper_expression_template: "Represent the system on a grid and simulate state transitions under local neighborhood rules."
+  - id: system_dynamics
+    name: System Dynamics
+    category: simulation
+    suitable_for:
+      - feedback systems
+      - stock-flow evolution
+    input_requirements:
+      - state variables
+      - flow equations
+      - parameters and time horizon
+    output_type: trajectories, scenario comparison
+    advantages:
+      - captures feedback loops
+      - strong policy scenario expression
+    limitations:
+      - parameter estimation can be uncertain
+      - model structure may be subjective
+    typical_workflow:
+      - define stocks and flows
+      - write differential or difference equations
+      - simulate scenarios
+      - compare trajectories
+    python_libraries:
+      - scipy
+      - numpy
+    paper_expression_template: "Model stocks, flows, and feedback loops, then simulate system trajectories under different policy scenarios."

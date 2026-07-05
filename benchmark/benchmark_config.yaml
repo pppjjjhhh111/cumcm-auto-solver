@@ -1,0 +1,12 @@
+results_dir: results
+tasks:
+  - task_id: sample_problem
+    problem_file: examples/sample_problem/problem.txt
+    data_dir: examples/sample_problem/data
+    expected_problem_type: data_driven_analysis
+    expected_outputs:
+      - outputs/reports/solution_report.md
+    scoring_rubric:
+      report_completeness_weight: 0.4
+      execution_weight: 0.4
+      figure_weight: 0.2

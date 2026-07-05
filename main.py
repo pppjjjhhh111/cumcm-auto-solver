@@ -1,0 +1,184 @@
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+from src.core.llm_client import (
+    DeepSeekLLMClient,
+    LLMClient,
+    LocalHTTPLLMClient,
+    MockLLMClient,
+    OpenAICompatibleLLMClient,
+    RealLLMClient,
+)
+from src.core.workflow import WorkflowRunner
+from src.evaluation.batch_runner import BatchRunner
+from src.rag.vector_store import KeywordVectorStore
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="CUMCM auto-solver research prototype.")
+    parser.add_argument("--problem", default=None, help="Path to problem file: pdf, docx, txt, csv, or xlsx.")
+    parser.add_argument("--data", default=None, help="Path to a data file or data directory.")
+    parser.add_argument("--output-dir", default="outputs", help="Directory for logs, code, figures, and reports.")
+    parser.add_argument("--max-repairs", type=int, default=3, help="Maximum automatic code repair attempts.")
+    parser.add_argument(
+        "--llm",
+        choices=["auto", "mock", "deepseek", "real", "openai-compatible", "local-http", "config"],
+        default="auto",
+        help="LLM backend. auto uses DeepSeek when DEEPSEEK_API_KEY is set, otherwise mock.",
+    )
+    parser.add_argument("--llm-config", default="config/model_config.yaml", help="LLM provider config yaml.")
+    parser.add_argument("--deepseek-model", default=None, help="DeepSeek model name.")
+    parser.add_argument("--deepseek-base-url", default=None, help="DeepSeek OpenAI-compatible base URL.")
+    parser.add_argument("--llm-strict", action="store_true", help="Fail workflow if a real LLM call fails.")
+    parser.add_argument("--use-rag", action="store_true", help="Use local knowledge_base retrieval during strategy generation.")
+    parser.add_argument("--kb-dir", default="knowledge_base", help="Local knowledge base directory.")
+    parser.add_argument("--build-kb", default=None, help="Build a local RAG index for the given knowledge base directory.")
+    parser.add_argument("--benchmark", default=None, help="Run benchmark tasks from a yaml/json config.")
+    parser.add_argument("--export-docx", action="store_true", help="Export outputs/reports/solution_report.docx.")
+    parser.add_argument("--export-pdf", action="store_true", help="Try to export outputs/reports/solution_report.pdf.")
+    parser.add_argument("--disable-reflection", action="store_true", help="Skip ReflectionAgent and revision pass.")
+    return parser
+
+
+def build_llm_client(args: argparse.Namespace, project_root: Path) -> LLMClient:
+    if args.llm == "auto":
+        if os.environ.get("DEEPSEEK_API_KEY"):
+            return DeepSeekLLMClient(
+                model=args.deepseek_model,
+                base_url=args.deepseek_base_url,
+                strict=args.llm_strict,
+            )
+        return MockLLMClient()
+    if args.llm == "mock":
+        return MockLLMClient()
+    if args.llm == "deepseek":
+        return DeepSeekLLMClient(
+            model=args.deepseek_model,
+            base_url=args.deepseek_base_url,
+            strict=args.llm_strict,
+        )
+    if args.llm == "real":
+        return RealLLMClient()
+    config = load_llm_config(project_root / args.llm_config)
+    provider = config.get("provider", "mock") if args.llm == "config" else args.llm.replace("-", "_")
+    if provider in {"mock", ""}:
+        return MockLLMClient()
+    if provider == "deepseek":
+        cfg = config.get("deepseek", {})
+        return DeepSeekLLMClient(
+            model=args.deepseek_model or cfg.get("model"),
+            base_url=args.deepseek_base_url or cfg.get("base_url"),
+            max_tokens=int(cfg.get("max_tokens", 4096)),
+            temperature=float(cfg.get("temperature", 0.2)),
+            timeout_seconds=int(cfg.get("timeout_seconds", 60)),
+            strict=args.llm_strict,
+        )
+    if provider == "openai_compatible":
+        cfg = config.get("openai_compatible", {})
+        return OpenAICompatibleLLMClient(
+            base_url=cfg.get("base_url", ""),
+            api_key_env=cfg.get("api_key_env", "OPENAI_API_KEY"),
+            model=cfg.get("model", ""),
+            temperature=float(cfg.get("temperature", 0.2)),
+            max_tokens=int(cfg.get("max_tokens", 4096)),
+            timeout_seconds=int(cfg.get("timeout_seconds", 60)),
+            strict=args.llm_strict,
+        )
+    if provider == "local_http":
+        cfg = config.get("local_http", {})
+        return LocalHTTPLLMClient(
+            base_url=cfg.get("base_url", "http://localhost:8000/v1"),
+            api_key_env=cfg.get("api_key_env", "LOCAL_LLM_API_KEY"),
+            model=cfg.get("model", ""),
+            temperature=float(cfg.get("temperature", 0.2)),
+            max_tokens=int(cfg.get("max_tokens", 4096)),
+            timeout_seconds=int(cfg.get("timeout_seconds", 60)),
+            strict=args.llm_strict,
+        )
+    raise ValueError(f"Unsupported provider in config: {provider}")
+
+
+def load_llm_config(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"provider": "mock"}
+    text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() in {".yaml", ".yml"}:
+        import yaml
+
+        return yaml.safe_load(text) or {}
+    import json
+
+    return json.loads(text)
+
+
+def build_kb(project_root: Path, kb_dir: Path) -> int:
+    if not kb_dir.is_absolute():
+        kb_dir = project_root / kb_dir
+    store = KeywordVectorStore(kb_dir)
+    summary = store.build_index()
+    index_path = store.save_index()
+    print(f"Knowledge base indexed: {summary['document_count']} chunks, {summary['term_count']} terms.")
+    print(f"Index: {index_path}")
+    return 0
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    project_root = Path(__file__).resolve().parent
+
+    if args.build_kb:
+        return build_kb(project_root, Path(args.build_kb))
+
+    try:
+        llm_client = build_llm_client(args, project_root)
+    except (ValueError, RuntimeError) as exc:
+        print(f"LLM backend error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.benchmark:
+        result = BatchRunner(project_root=project_root, llm_client=llm_client).run(project_root / args.benchmark)
+        print("Benchmark finished.")
+        print(f"Summary: {result.get('summary_csv')}")
+        print(f"Report: {result.get('benchmark_report')}")
+        return 0
+
+    if not args.problem:
+        print("--problem is required unless --build-kb or --benchmark is used.", file=sys.stderr)
+        return 2
+
+    runner = WorkflowRunner(
+        project_root=project_root,
+        llm_client=llm_client,
+        output_dir=project_root / args.output_dir,
+        max_repairs=args.max_repairs,
+        use_rag=args.use_rag,
+        kb_dir=project_root / args.kb_dir,
+        enable_reflection=not args.disable_reflection,
+        export_docx=args.export_docx,
+        export_pdf=args.export_pdf,
+    )
+    try:
+        state = runner.run(Path(args.problem), Path(args.data) if args.data else None)
+    except (NotImplementedError, RuntimeError, ValueError) as exc:
+        print(f"Workflow error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+    print("Workflow finished.")
+    print(f"LLM backend: {args.llm}")
+    print(f"Report: {state.paper.get('report_path')}")
+    print(f"Code dir: {state.code_dir}")
+    print(f"Figures dir: {state.figures_dir}")
+    print(f"Logs dir: {state.logs_dir}")
+    print(f"Execution success: {state.execution_result.get('success')}")
+    if state.exports:
+        print(f"Exports: {state.exports}")
+    return 0 if state.paper.get("report_path") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

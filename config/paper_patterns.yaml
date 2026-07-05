@@ -1,0 +1,231 @@
+evaluation_problem:
+  name: 综合评价类问题
+  problem_aliases:
+    - evaluation
+    - data_preprocessing
+    - result_interpretation
+    - descriptive_modeling
+    - data_driven_analysis
+  section_order:
+    - 指标体系构建
+    - 数据标准化
+    - 权重计算
+    - 综合评价
+    - 排名与解释
+    - 灵敏度分析
+  key_formulas:
+    - "正向指标标准化：z_ij = (x_ij - min x_j) / (max x_j - min x_j)"
+    - "负向指标标准化：z_ij = (max x_j - x_ij) / (max x_j - min x_j)"
+    - "综合得分：S_i = sum_j w_j z_ij"
+    - "TOPSIS 贴近度：C_i = D_i^- / (D_i^+ + D_i^-)"
+  recommended_figures:
+    - 指标权重柱状图
+    - 综合得分排名图
+    - 灵敏度扰动折线图
+  recommended_tables:
+    - 原始指标表
+    - 标准化指标表
+    - 权重与综合得分表
+    - 排名结果表
+  common_assumptions:
+    - 指标体系能够覆盖评价对象的主要特征。
+    - 指标经过同向化和无量纲化后具有可比性。
+    - 权重设置能够反映指标信息量或专家偏好。
+  common_validation_methods:
+    - 权重扰动敏感性分析
+    - 不同评价方法结果对比
+    - 排名稳定性检验
+  writing_style_tips:
+    - 先解释指标选择依据，再给出标准化和权重计算过程。
+    - 排名结果要结合实际含义解释，不只罗列数值。
+    - 灵敏度分析应说明结论是否稳定。
+prediction_problem:
+  name: 预测类问题
+  problem_aliases:
+    - prediction
+    - forecast
+    - time_series
+  section_order:
+    - 数据预处理
+    - 特征工程
+    - 模型训练
+    - 误差评价
+    - 预测结果
+    - 置信区间或不确定性分析
+  key_formulas:
+    - "回归模型：y = beta_0 + beta_1 x_1 + ... + beta_k x_k + epsilon"
+    - "均方根误差：RMSE = sqrt(1/n * sum_i (y_i - yhat_i)^2)"
+    - "平均绝对百分比误差：MAPE = 1/n * sum_i |(y_i - yhat_i) / y_i|"
+    - "线性趋势预测：yhat_t = a + b t"
+  recommended_figures:
+    - 历史序列趋势图
+    - 真实值与预测值对比图
+    - 残差分布图
+    - 预测区间图
+  recommended_tables:
+    - 特征说明表
+    - 模型参数表
+    - 误差指标表
+    - 未来预测结果表
+  common_assumptions:
+    - 历史数据能够代表短期未来变化规律。
+    - 数据预处理不会改变主要趋势。
+    - 预测区间内外部环境无剧烈结构性变化。
+  common_validation_methods:
+    - 留出集误差评价
+    - 交叉验证
+    - 残差分析
+    - 不同模型预测结果对比
+  writing_style_tips:
+    - 明确训练集、验证集和预测区间。
+    - 同时报告误差指标和预测图。
+    - 对长期外推保持谨慎表述。
+optimization_problem:
+  name: 优化类问题
+  problem_aliases:
+    - optimization
+    - allocation
+    - scheduling
+  section_order:
+    - 决策变量定义
+    - 目标函数构建
+    - 约束条件设置
+    - 求解算法
+    - 最优方案
+    - 灵敏度分析
+  key_formulas:
+    - "目标函数：max/min Z = f(x)"
+    - "约束条件：g_m(x) <= b_m, h_l(x) = 0"
+    - "线性规划形式：max c^T x, s.t. Ax <= b, x >= 0"
+  recommended_figures:
+    - 求解流程图
+    - 目标函数收敛曲线
+    - 资源配置对比图
+  recommended_tables:
+    - 决策变量定义表
+    - 参数与约束表
+    - 最优方案表
+    - 灵敏度参数表
+  common_assumptions:
+    - 决策变量和约束能够准确描述现实限制。
+    - 参数在求解周期内保持稳定。
+    - 目标函数能代表主要优化目标。
+  common_validation_methods:
+    - 约束可行性检查
+    - 参数扰动敏感性分析
+    - 与基准方案对比
+  writing_style_tips:
+    - 先定义变量，再写目标函数和约束。
+    - 说明求解算法适用性和停止条件。
+    - 最优方案要转化为可执行建议。
+classification_problem:
+  name: 分类聚类类问题
+  problem_aliases:
+    - classification
+    - clustering
+    - cluster
+  section_order:
+    - 特征构建
+    - 数据降维
+    - 分类或聚类模型
+    - 类别解释
+    - 稳定性检验
+  key_formulas:
+    - "欧氏距离：d(x_i, x_j) = sqrt(sum_k (x_ik - x_jk)^2)"
+    - "类内平方和：SSE = sum_i sum_{x in C_i} ||x - mu_i||^2"
+    - "分类准确率：Accuracy = correct / total"
+  recommended_figures:
+    - 降维散点图
+    - 类别分布图
+    - 混淆矩阵或轮廓系数图
+  recommended_tables:
+    - 特征工程表
+    - 类别中心或类别特征表
+    - 分类评价指标表
+  common_assumptions:
+    - 选取特征能够反映对象差异。
+    - 样本间距离或分类边界具有实际含义。
+    - 类别数量或标签定义合理。
+  common_validation_methods:
+    - 轮廓系数
+    - 混淆矩阵
+    - 参数扰动后类别稳定性检验
+  writing_style_tips:
+    - 解释每个类别的现实含义。
+    - 对聚类问题避免只给标签不解释。
+    - 分类问题要报告训练与验证表现。
+simulation_problem:
+  name: 仿真类问题
+  problem_aliases:
+    - simulation
+    - monte_carlo
+    - dynamic
+  section_order:
+    - 仿真假设
+    - 状态变量定义
+    - 演化规则
+    - 仿真实验设计
+    - 结果分析
+    - 参数敏感性分析
+  key_formulas:
+    - "状态转移：s_{t+1} = F(s_t, u_t, theta)"
+    - "蒙特卡洛估计：E[g(X)] ≈ 1/N * sum_i g(x_i)"
+    - "参数扰动：theta' = theta * (1 ± delta)"
+  recommended_figures:
+    - 仿真流程图
+    - 状态变量随时间变化图
+    - 多场景对比图
+  recommended_tables:
+    - 状态变量定义表
+    - 参数设置表
+    - 场景实验结果表
+  common_assumptions:
+    - 仿真规则能近似描述系统演化机制。
+    - 参数取值范围合理。
+    - 随机实验次数足以稳定估计结果。
+  common_validation_methods:
+    - 多次重复实验
+    - 参数敏感性分析
+    - 与历史观测或基准情景对比
+  writing_style_tips:
+    - 明确状态变量、参数和演化规则。
+    - 用场景对比支持结论。
+    - 随机仿真要报告重复次数和波动范围。
+network_problem:
+  name: 网络图论类问题
+  problem_aliases:
+    - network
+    - graph
+    - shortest_path
+    - max_flow
+    - flow
+  section_order:
+    - 节点与边定义
+    - 网络指标
+    - 路径或流量模型
+    - 网络结构分析
+    - 优化策略
+  key_formulas:
+    - "最短路目标：min sum_{(i,j) in P} c_ij"
+    - "流量守恒：sum_j f_ij - sum_j f_ji = b_i"
+    - "容量约束：0 <= f_ij <= u_ij"
+  recommended_figures:
+    - 网络拓扑图
+    - 最短路径或流量示意图
+    - 节点重要性排名图
+  recommended_tables:
+    - 节点与边定义表
+    - 边权或容量表
+    - 路径或流量结果表
+  common_assumptions:
+    - 节点、边和权重能真实表示网络关系。
+    - 边权或容量在分析周期内稳定。
+    - 网络优化目标与实际需求一致。
+  common_validation_methods:
+    - 路径或流量可行性检查
+    - 关键边扰动分析
+    - 与基准路径或基准流量方案对比
+  writing_style_tips:
+    - 先说明网络如何由现实问题抽象得到。
+    - 图论结果要解释对应的现实意义。
+    - 优化策略要结合瓶颈节点或关键边。
