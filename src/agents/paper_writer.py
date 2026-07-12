@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.rag.reference_utils import reference_summary, select_references
 from src.tools.paper_pattern_library import PaperPatternLibrary
 from src.utils.json_utils import write_json
 
@@ -47,6 +48,7 @@ class PaperWriterAgent(BaseAgent):
         figure_plan: dict[str, Any] | None = None,
         formulas: dict[str, Any] | None = None,
         reflection_report: dict[str, Any] | None = None,
+        retrieved_references: Any = None,
     ) -> dict[str, Any]:
         reports_dir.mkdir(parents=True, exist_ok=True)
         report_path = reports_dir / "solution_report.md"
@@ -54,6 +56,7 @@ class PaperWriterAgent(BaseAgent):
         figure_plan = figure_plan or {}
         formulas = formulas or {}
         reflection_report = reflection_report or {}
+        paper_references = select_references(retrieved_references, purpose="paper", limit=5)
         pattern_selection = self.pattern_library.recommend_pattern(parsed_problem)
         if self.logs_dir is not None:
             write_json(self.logs_dir / "paper_pattern_selection.json", pattern_selection)
@@ -70,6 +73,7 @@ class PaperWriterAgent(BaseAgent):
             figure_plan=figure_plan,
             formulas=formulas,
             reflection_report=reflection_report,
+            paper_references=paper_references,
         )
         report_path.write_text(markdown, encoding="utf-8")
         return {
@@ -81,11 +85,14 @@ class PaperWriterAgent(BaseAgent):
                     "primary_pattern": pattern_selection.get("primary_pattern", {}).get("id"),
                     "has_data_profile": bool(data_profile.get("files")),
                     "formula_count": len(formulas.get("latex_blocks", [])),
+                    "retrieved_reference_count": len(paper_references),
                 },
             ),
             "report_path": str(report_path),
             "sections": self.REQUIRED_SECTIONS,
             "pattern_selection": pattern_selection,
+            "retrieved_references": paper_references,
+            "knowledge_guidance": reference_summary(paper_references),
             "markdown": markdown,
         }
 
@@ -102,11 +109,13 @@ class PaperWriterAgent(BaseAgent):
         figure_plan: dict[str, Any],
         formulas: dict[str, Any],
         reflection_report: dict[str, Any],
+        paper_references: list[dict[str, Any]],
     ) -> str:
         questions = parsed_problem.get("questions", [])
         question_lines = "\n".join(f"- {q.get('id')}: {q.get('text')}" for q in questions) or "- 未识别到明确小问。"
         keywords = "；".join(parsed_problem.get("keywords", [])) or "数学建模；自动求解；数据分析"
         pattern_summary = self._pattern_detail_lines(pattern_selection)
+        paper_guidance = self._paper_guidance_section(paper_references)
         assumptions = self._combined_list(pattern_selection, "common_assumptions")
         solution_competition = self._solution_competition_section(selected_model)
         model_selection_reason = self._model_selection_reason_section(selected_model)
@@ -146,6 +155,8 @@ class PaperWriterAgent(BaseAgent):
 系统解析得到的整体题型为 `{parsed_problem.get('problem_type', 'general_modeling')}`。论文结构根据题型动态组合，主要写作套路如下：
 
 {pattern_summary}
+
+{paper_guidance}
 
 ## 建模方案比较与选择
 
@@ -236,6 +247,14 @@ class PaperWriterAgent(BaseAgent):
             f"总分 {(selected.get('score') or {}).get('total_score', '')}。\n\n"
             f"选择理由：{selected.get('paper_narrative', selected.get('overall_idea', ''))}\n\n"
             f"风险提示：\n\n{risks}"
+        )
+
+    def _paper_guidance_section(self, paper_references: list[dict[str, Any]]) -> str:
+        if not paper_references:
+            return "本地知识库未提供可用论文模板参考，报告按内置 Paper Pattern Library 组织。"
+        return (
+            "本地知识库写作参考：系统仅使用以下条目的结构启发，不复制原文。"
+            f"{reference_summary(paper_references)}。"
         )
 
     def _model_selection_reason_section(self, selected_model: dict[str, Any]) -> str:

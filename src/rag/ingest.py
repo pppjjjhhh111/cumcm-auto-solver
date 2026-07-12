@@ -17,17 +17,62 @@ def ingest_documents(input_dir: Path) -> list[dict[str, Any]]:
     files = sorted(path for path in input_dir.rglob("*") if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS)
     for file_path in files:
         text = _read_document(file_path)
+        relative_path = file_path.relative_to(input_dir).as_posix()
+        category = _category_from_path(relative_path)
+        purpose = _purpose_from_path(relative_path)
         for idx, chunk in enumerate(chunk_text(text)):
+            metadata = {
+                "extension": file_path.suffix.lower(),
+                "chunk_index": idx,
+                "category_from_path": category,
+                "purpose_from_path": purpose,
+            }
+            if isinstance(chunk, dict):
+                chunk_text_value = chunk.get("text", "")
+                metadata.update(chunk.get("metadata", {}))
+            else:
+                chunk_text_value = str(chunk)
             documents.append(
                 {
-                    "chunk_id": f"{file_path.relative_to(input_dir).as_posix()}::{idx}",
+                    "chunk_id": f"{relative_path}::{idx}",
                     "source_path": str(file_path),
-                    "relative_path": file_path.relative_to(input_dir).as_posix(),
-                    "text": chunk,
-                    "metadata": {"extension": file_path.suffix.lower(), "chunk_index": idx},
+                    "relative_path": relative_path,
+                    "text": chunk_text_value,
+                    "metadata": metadata,
                 }
             )
     return documents
+
+
+def _category_from_path(relative_path: str) -> str:
+    parts = [part.lower() for part in Path(relative_path).parts]
+    if not parts:
+        return "general"
+    if parts[0] == "methods":
+        return parts[1] if len(parts) > 1 else "method"
+    if parts[0] == "paper_templates":
+        return "paper_template"
+    if parts[0] == "code_patterns":
+        return "code_pattern"
+    if parts[0] == "notes":
+        return "note"
+    if parts[0] == "problems":
+        return "problem_pattern"
+    return parts[0]
+
+
+def _purpose_from_path(relative_path: str) -> str:
+    parts = [part.lower() for part in Path(relative_path).parts]
+    if not parts:
+        return "general"
+    mapping = {
+        "methods": "method",
+        "paper_templates": "paper",
+        "code_patterns": "code",
+        "notes": "note",
+        "problems": "problem",
+    }
+    return mapping.get(parts[0], "general")
 
 
 def _read_document(file_path: Path) -> str:

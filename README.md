@@ -78,7 +78,7 @@ python main.py --problem path/to/problem.pdf --export-docx
 python main.py --problem path/to/problem.docx --data path/to/data_dir --deepseek-model deepseek-v4-flash
 ```
 
-启用 RAG：
+启用本地知识库增强：
 
 ```bash
 python main.py --problem path/to/problem.pdf --data path/to/data_dir --use-rag
@@ -122,16 +122,43 @@ python -m streamlit run app.py --server.port 8504
 
 UI 只支持上传赛题文件和数据文件。未上传赛题文件时无法运行；未上传数据文件时，系统会提示并仅基于题面文本建模。
 
-### RAG 知识库
+### RAG 2.0 本地知识库增强
 
 本地知识库目录：
 
 - `knowledge_base/problems/`
-- `knowledge_base/methods/`
+- `knowledge_base/methods/evaluation/`
+- `knowledge_base/methods/prediction/`
+- `knowledge_base/methods/optimization/`
 - `knowledge_base/paper_templates/`
+- `knowledge_base/code_patterns/`
 - `knowledge_base/notes/`
 
-支持 `txt`、`md`、`pdf`、`docx`。检索结果只作为方法启发，报告会重新组织表达。
+当前仓库内置 70+ 张结构化 Markdown 知识卡，覆盖常见方法、论文模板、题型套路、通用建模经验和代码实现套路。
+
+支持 `txt`、`md`、`pdf`、`docx`。Markdown 文件会按标题切块并保留 `title_path`，中文检索支持 2/3/4-gram，因此“综合评价”“熵权法”“线性规划”“灵敏度分析”等短语更容易命中。
+
+构建索引：
+
+```bash
+python main.py --build-kb knowledge_base/
+```
+
+启用：
+
+```bash
+python main.py --problem path/to/problem.pdf --data path/to/data_dir --use-rag
+```
+
+启用后，知识库检索会辅助：
+
+- 模型选择和建模策略生成。
+- 公式生成。
+- 图表规划。
+- 论文结构和表达。
+- 代码结构建议。
+
+检索结果只作为方法启发和结构参考，不复制知识库原文。检索日志保存到 `outputs/logs/rag_retrievals.json`。
 
 ### Benchmark
 
@@ -249,7 +276,7 @@ Run without data files:
 python main.py --problem path/to/problem.pdf --export-docx
 ```
 
-Use RAG:
+Use local knowledge-base augmentation:
 
 ```bash
 python main.py --problem path/to/problem.pdf --data path/to/data_dir --use-rag
@@ -287,16 +314,37 @@ python -m streamlit run app.py --server.port 8504
 
 The UI accepts uploaded problem and data files only. A problem file is required; data files are optional.
 
-### RAG
+### RAG 2.0 Local Knowledge-Base Augmentation
 
 Knowledge base directories:
 
 - `knowledge_base/problems/`
-- `knowledge_base/methods/`
+- `knowledge_base/methods/evaluation/`
+- `knowledge_base/methods/prediction/`
+- `knowledge_base/methods/optimization/`
 - `knowledge_base/paper_templates/`
+- `knowledge_base/code_patterns/`
 - `knowledge_base/notes/`
 
+The repository now includes 70+ structured Markdown knowledge cards covering methods, paper templates, problem patterns, modeling notes, and code patterns.
+
 Supported files: `txt`, `md`, `pdf`, `docx`.
+
+Markdown files are split by headings with `title_path` metadata. Chinese retrieval uses 2/3/4-gram tokens, so short phrases such as comprehensive evaluation, entropy weight, linear programming, and sensitivity analysis are easier to match.
+
+Build the index:
+
+```bash
+python main.py --build-kb knowledge_base/
+```
+
+Enable it:
+
+```bash
+python main.py --problem path/to/problem.pdf --data path/to/data_dir --use-rag
+```
+
+When enabled, retrieval assists model selection, formula generation, figure planning, paper writing, and code structure hints. Retrieved text is used only as method inspiration and structural guidance; the generated report should not copy source passages verbatim. Retrieval logs are saved to `outputs/logs/rag_retrievals.json`.
 
 ### Benchmark
 

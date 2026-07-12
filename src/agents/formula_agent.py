@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.rag.reference_utils import reference_summary, select_references
 from src.utils.json_utils import write_json
 
 
@@ -17,8 +18,10 @@ class FormulaAgent(BaseAgent):
         sub_tasks: dict[str, Any],
         model_zoo_entries: list[dict[str, Any]] | None = None,
         parsed_problem: dict[str, Any] | None = None,
+        retrieved_references: Any = None,
     ) -> dict[str, Any]:
         parsed_problem = parsed_problem or {}
+        formula_references = select_references(retrieved_references, purpose="formula", limit=5)
         latex_blocks = []
         model_names = self._model_names(selected_strategy)
         problem_type = parsed_problem.get("problem_type", "general_modeling")
@@ -44,6 +47,7 @@ class FormulaAgent(BaseAgent):
                     "model_count": len(model_names),
                     "task_count": len(sub_tasks.get("tasks", [])),
                     "problem_type": problem_type,
+                    "retrieved_reference_count": len(formula_references),
                 },
             ),
             "variables": variables,
@@ -69,12 +73,22 @@ class FormulaAgent(BaseAgent):
                 {"latex": r"\Delta S=\frac{S(\theta+\delta)-S(\theta)}{S(\theta)}", "explanation": "Relative change used for sensitivity analysis."},
             ],
             "latex_blocks": latex_blocks,
-            "explanation": "Formulas are deterministic templates selected from the chosen model route.",
+            "retrieved_references": formula_references,
+            "knowledge_guidance": reference_summary(formula_references),
+            "explanation": self._explanation(formula_references),
         }
         result["checks"] = self._checks(result, sub_tasks)
         if self.logs_dir is not None:
             write_json(self.logs_dir / "formulas.json", result)
         return result
+
+    def _explanation(self, formula_references: list[dict[str, Any]]) -> str:
+        if not formula_references:
+            return "Formulas are deterministic templates selected from the chosen model route."
+        return (
+            "Formulas are deterministic templates selected from the chosen model route, "
+            f"with local knowledge-base hints from {reference_summary(formula_references)}."
+        )
 
     def _model_names(self, selected_strategy: dict[str, Any]) -> list[str]:
         names = []

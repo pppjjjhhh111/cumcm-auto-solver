@@ -26,12 +26,20 @@ class Retriever:
         except Exception as exc:  # pragma: no cover - defensive guard for optional RAG.
             self.warning = f"RAG index unavailable: {type(exc).__name__}: {exc}"
 
-    def retrieve(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 5,
+        purpose: str | None = None,
+        category: str | None = None,
+    ) -> list[dict[str, Any]]:
         if self.warning:
             results: list[dict[str, Any]] = []
             payload = {
                 "query": query,
                 "top_k": top_k,
+                "purpose": purpose,
+                "category": category,
                 "results": results,
                 "warnings": [self.warning],
                 "status": "skipped",
@@ -40,7 +48,7 @@ class Retriever:
                 write_json(self.logs_dir / "rag_retrievals.json", payload)
             return results
         try:
-            results = self.store.retrieve(query, top_k=top_k)
+            results = self.store.retrieve(query, top_k=top_k, purpose=purpose, category=category)
             warnings = [] if results else [f"No RAG matches found in {self.kb_dir}."]
             status = "ok" if results else "no_matches"
         except Exception as exc:  # pragma: no cover - defensive guard for optional RAG.
@@ -50,6 +58,14 @@ class Retriever:
         if self.logs_dir is not None:
             write_json(
                 self.logs_dir / "rag_retrievals.json",
-                {"query": query, "top_k": top_k, "results": results, "warnings": warnings, "status": status},
+                {
+                    "query": query,
+                    "top_k": top_k,
+                    "purpose": purpose,
+                    "category": category,
+                    "results": results,
+                    "warnings": warnings,
+                    "status": status,
+                },
             )
         return results

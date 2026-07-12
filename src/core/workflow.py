@@ -123,6 +123,7 @@ class WorkflowRunner:
             sub_tasks=state.decomposed_tasks,
             model_zoo_entries=[],
             parsed_problem=state.parsed_problem,
+            retrieved_references=state.rag_retrievals,
         )
         self._log(formula_agent.name, state.formulas)
 
@@ -132,6 +133,7 @@ class WorkflowRunner:
             state.data_profile,
             state.selected_model,
             execution_results={},
+            retrieved_references=state.rag_retrievals,
         )
         self._log(figure_planner.name, state.figure_plan)
 
@@ -143,6 +145,7 @@ class WorkflowRunner:
             state.selected_model,
             figure_plan=state.figure_plan,
             data_profile=state.data_profile,
+            retrieved_references=state.rag_retrievals,
         )
         self._log(code_generator.name, {k: v for k, v in state.generated_code.items() if k != "code"})
 
@@ -153,6 +156,7 @@ class WorkflowRunner:
             state.data_profile,
             state.selected_model,
             execution_results=state.execution_result,
+            retrieved_references=state.rag_retrievals,
         )
         self._log(f"{figure_planner.name}_post_execution", state.figure_plan)
 
@@ -176,6 +180,7 @@ class WorkflowRunner:
             data_profile=state.data_profile,
             figure_plan=state.figure_plan,
             formulas=state.formulas,
+            retrieved_references=state.rag_retrievals,
         )
         self._log(paper_writer.name, {k: v for k, v in state.paper.items() if k != "markdown"})
 
@@ -217,6 +222,7 @@ class WorkflowRunner:
                 figure_plan=state.figure_plan,
                 formulas=state.formulas,
                 reflection_report=state.reflection_report,
+                retrieved_references=state.rag_retrievals,
             )
             self._log(f"{paper_writer.name}_final", {k: v for k, v in state.paper.items() if k != "markdown"})
 
@@ -385,17 +391,61 @@ class WorkflowRunner:
             state.errors.append({"stage": "report_quality_check", "error": state.report_quality["error"]})
             write_json(state.logs_dir / "report_quality_check.json", state.report_quality)
 
-    def _retrieve_rag(self, state: SolverState) -> list[dict[str, Any]]:
-        query_parts = [
-            state.parsed_problem.get("background", ""),
-            state.parsed_problem.get("problem_type", ""),
-            " ".join(str(item.get("text", "")) for item in state.parsed_problem.get("questions", [])),
-        ]
-        query = "\n".join(part for part in query_parts if part).strip()
-        if not query:
-            return []
-        retriever = Retriever(self.kb_dir, logs_dir=state.logs_dir)
-        return retriever.retrieve(query, top_k=5)
+    def _retrieve_rag(self, state: SolverState) -> dict[str, Any]:
+        problem_type = state.parsed_problem.get("problem_type", "")
+        background = state.parsed_problem.get("background", "")
+        questions = state.parsed_problem.get("questions", [])
+        question_text = " ".join(str(item.get("text", "")) for item in questions)
+        global_query = "\n".join(part for part in [background, problem_type] if part).strip()
+        combined_query = "\n".join(part for part in [global_query, question_text] if part).strip()
+        payload: dict[str, Any] = {
+            "global_references": [],
+            "question_references": {},
+            "purpose_references": {"strategy": [], "formula": [], "paper": [], "figure": [], "code": []},
+            "warnings": [],
+            "status": "ok",
+        }
+        if not combined_query:
+            payload["warnings"].append("RAG skipped because parsed problem text is empty.")
+            payload["status"] = "skipped"
+            write_json(state.logs_dir / "rag_retrievals.json", payload)
+            return payload
+
+        retriever = Retriever(self.kb_dir, logs_dir=None)
+        if retriever.warning:
+            payload["warnings"].append(retriever.warning)
+
+        payload["global_references"] = retriever.retrieve(global_query or combined_query, top_k=5, purpose="general")
+        for question in questions:
+            question_id = str(question.get("id") or f"Q{len(payload['question_references']) + 1}")
+            query = "\n".join(
+                part
+                for part in [
+                    problem_type,
+                    str(question.get("text", "")),
+                    str(question.get("objective", "")),
+                    str(question.get("required_output", "")),
+                ]
+                if part
+            )
+            payload["question_references"][question_id] = retriever.retrieve(query, top_k=4, purpose="strategy")
+
+        purpose_queries = {
+            "strategy": f"{combined_query}\n建模方法 题型 模型选择",
+            "formula": f"{combined_query}\n数学公式 模型方程 约束 目标函数",
+            "paper": f"{combined_query}\n论文模板 写作结构 摘要 模型建立 结果分析",
+            "figure": f"{combined_query}\n图表 可视化 灵敏度分析 残差 热力图",
+            "code": f"{combined_query}\nPython 代码 实现 数据处理 画图",
+        }
+        for purpose, query in purpose_queries.items():
+            payload["purpose_references"][purpose] = retriever.retrieve(query, top_k=5, purpose=purpose)
+
+        if not any(payload["purpose_references"].values()) and not payload["global_references"]:
+            payload["status"] = "no_matches" if not payload["warnings"] else "skipped"
+            if not payload["warnings"]:
+                payload["warnings"].append(f"No RAG matches found in {self.kb_dir}.")
+        write_json(state.logs_dir / "rag_retrievals.json", payload)
+        return payload
 
     def _export_reports(self, state: SolverState) -> dict[str, Any]:
         report_path = state.paper.get("report_path")

@@ -845,7 +845,7 @@ def hero(provider: str, use_rag: bool, enable_reflection: bool) -> None:
                 </div>
                 <div class="glass">
                     <div class="card-title">Runtime Status</div>
-                    <div style="margin-top:12px;">{pill("DeepSeek", "ok")}{pill("RAG ON" if use_rag else "RAG OFF", "info" if use_rag else "neutral")}{pill("Reflection ON" if enable_reflection else "Reflection OFF", "info" if enable_reflection else "neutral")}{pill("Report " + report_status, "ok" if report_status == "Ready" else "warn")}</div>
+                    <div style="margin-top:12px;">{pill("DeepSeek", "ok")}{pill("知识库增强 ON" if use_rag else "知识库增强 OFF", "info" if use_rag else "neutral")}{pill("Reflection ON" if enable_reflection else "Reflection OFF", "info" if enable_reflection else "neutral")}{pill("Report " + report_status, "ok" if report_status == "Ready" else "warn")}</div>
                     <div class="muted" style="margin-top:12px;">
                         固定 DeepSeek 后端。未配置 DEEPSEEK_API_KEY 时仍可浏览历史产物，但不能启动新任务。
                     </div>
@@ -923,7 +923,12 @@ def render_sidebar() -> dict[str, Any]:
         st.markdown('<div class="sidebar-section">01 · Runtime</div>', unsafe_allow_html=True)
         st.success("LLM Provider：DeepSeek")
         st.session_state["expert_mode"] = st.toggle("Expert Mode", value=st.session_state.get("expert_mode", False))
-        use_rag = st.toggle("启用 RAG", value=False)
+        use_rag = st.toggle(
+            "启用本地知识库增强",
+            value=False,
+            help="从 knowledge_base 中检索方法卡、论文模板和代码套路，辅助建模与写作。",
+        )
+        st.caption("从 knowledge_base 中检索方法卡、论文模板和代码套路，辅助建模与写作。")
         enable_reflection = st.toggle("启用 Reflection Loop", value=True)
         export_docx = st.toggle("导出 Word", value=True)
         export_pdf = st.toggle("尝试导出 PDF", value=False)
@@ -1110,7 +1115,7 @@ def launch_panel(config: dict[str, Any], state: dict[str, Any]) -> None:
             )
         cols = st.columns(2)
         with cols[0]:
-            metric_card("RAG", "ON" if config["use_rag"] else "OFF", "知识库检索", "🔎")
+            metric_card("知识库增强", "ON" if config["use_rag"] else "OFF", "本地检索", "🔎")
         with cols[1]:
             metric_card("Reflection", "ON" if config["enable_reflection"] else "OFF", "自动反思", "🪞")
 

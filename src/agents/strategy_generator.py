@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.rag.reference_utils import count_references, reference_summary, select_references
 from src.tools.model_zoo import ModelZoo
 from src.utils.json_utils import write_json
 
@@ -18,18 +19,20 @@ class StrategyGeneratorAgent(BaseAgent):
         self,
         decomposed_tasks: dict[str, Any],
         data_profile: dict[str, Any] | None = None,
-        retrieved_references: list[dict[str, Any]] | None = None,
+        retrieved_references: Any = None,
     ) -> dict[str, Any]:
         data_profile = data_profile or {}
         retrieved_references = retrieved_references or []
         strategies = []
         for task in decomposed_tasks.get("tasks", []):
-            candidates = self._candidates_for(task, data_profile, retrieved_references)
+            task_refs = self._references_for_task(task, retrieved_references)
+            candidates = self._candidates_for(task, data_profile, task_refs)
             strategies.append(
                 {
                     "task_id": task["id"],
                     "task_type": task["task_type"],
                     "task_description": task.get("description", ""),
+                    "retrieved_references": task_refs,
                     "candidates": candidates,
                 }
             )
@@ -41,7 +44,7 @@ class StrategyGeneratorAgent(BaseAgent):
                     "task_count": len(decomposed_tasks.get("tasks", [])),
                     "source": "model_zoo",
                     "has_data_profile": bool(data_profile.get("files")),
-                    "retrieved_reference_count": len(retrieved_references),
+                    "retrieved_reference_count": count_references(retrieved_references),
                 },
             ),
             "recommendation_source": "config/model_zoo.yaml",
@@ -70,6 +73,15 @@ class StrategyGeneratorAgent(BaseAgent):
         )
         return [self._candidate_from_model(model, task, data_type, retrieved_references) for model in recommended[:3]]
 
+    def _references_for_task(self, task: dict[str, Any], retrieved_references: Any) -> list[dict[str, Any]]:
+        question_id = task.get("question_id") or str(task.get("id", "")).split(".")[0]
+        return select_references(
+            retrieved_references,
+            purpose="strategy",
+            question_id=str(question_id) if question_id else None,
+            limit=5,
+        )
+
     def _candidate_from_model(
         self,
         model: dict[str, Any],
@@ -83,16 +95,19 @@ class StrategyGeneratorAgent(BaseAgent):
         workflow = model.get("typical_workflow", [])
         difficulty = self._implementation_difficulty(model)
         method = "; ".join(workflow[:4]) if workflow else model.get("paper_expression_template", "")
+        reference_note = reference_summary(retrieved_references, limit=2)
+        base_reason = model.get("fit_reason") or (
+            f"{model.get('name')} is suitable for {task.get('task_type')} tasks "
+            f"because it supports {', '.join(model.get('suitable_for', [])[:2])}."
+        )
+        if reference_note:
+            base_reason = f"{base_reason} 知识库依据摘要：参考 {reference_note} 的方法提示。"
         return {
             "model_id": model.get("id"),
             "name": model.get("name"),
             "category": model.get("category"),
             "method": method,
-            "why_suitable": model.get("fit_reason")
-            or (
-                f"{model.get('name')} is suitable for {task.get('task_type')} tasks "
-                f"because it supports {', '.join(model.get('suitable_for', [])[:2])}."
-            ),
+            "why_suitable": base_reason,
             "input_data_requirements": input_requirements,
             "expected_output": model.get("output_type"),
             "implementation_difficulty": difficulty,

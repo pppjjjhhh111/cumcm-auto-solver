@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.rag.reference_utils import reference_summary, select_references
 
 
 class CodeGeneratorAgent(BaseAgent):
@@ -19,8 +20,10 @@ class CodeGeneratorAgent(BaseAgent):
         selected_model: dict[str, Any],
         figure_plan: dict[str, Any] | None = None,
         data_profile: dict[str, Any] | None = None,
+        retrieved_references: Any = None,
     ) -> dict[str, Any]:
-        code = self._build_code(project_root, data_path, figure_plan or {})
+        code_references = select_references(retrieved_references, purpose="code", limit=5)
+        code = self._build_code(project_root, data_path, figure_plan or {}, code_references)
         return {
             "agent": self.name,
             "llm_trace": self.llm_client.complete_json(
@@ -30,15 +33,24 @@ class CodeGeneratorAgent(BaseAgent):
                     "has_data_path": data_path is not None,
                     "planned_figures": len((figure_plan or {}).get("figure_plan", [])),
                     "profiled_tables": (data_profile or {}).get("table_count", 0),
+                    "retrieved_reference_count": len(code_references),
                 },
             ),
             "filename": "generated_solution.py",
             "language": "python",
             "code": code,
+            "retrieved_references": code_references,
+            "knowledge_guidance": reference_summary(code_references),
             "notes": "Generated code uses standard library only and reads project-local data through executor environment variables.",
         }
 
-    def _build_code(self, project_root: Path, data_path: Path | None, figure_plan: dict[str, Any]) -> str:
+    def _build_code(
+        self,
+        project_root: Path,
+        data_path: Path | None,
+        figure_plan: dict[str, Any],
+        code_references: list[dict[str, Any]] | None = None,
+    ) -> str:
         data_rel = ""
         if data_path is not None:
             try:
@@ -59,9 +71,12 @@ class CodeGeneratorAgent(BaseAgent):
             ensure_ascii=False,
         )
         data_rel_literal = json.dumps(data_rel, ensure_ascii=False)
+        code_guidance_literal = json.dumps(reference_summary(code_references or []), ensure_ascii=False)
         return dedent(
             f"""
             from __future__ import annotations
+
+            # Local knowledge-base code guidance summary: {code_guidance_literal}
 
             import csv
             import json

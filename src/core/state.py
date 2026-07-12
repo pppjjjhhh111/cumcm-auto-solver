@@ -26,7 +26,7 @@ class SolverState:
     parsed_problem: dict[str, Any] = field(default_factory=dict)
     decomposed_tasks: dict[str, Any] = field(default_factory=dict)
     data_profile: dict[str, Any] = field(default_factory=dict)
-    rag_retrievals: list[dict[str, Any]] = field(default_factory=list)
+    rag_retrievals: Any = field(default_factory=list)
     candidate_strategies: dict[str, Any] = field(default_factory=dict)
     selected_model: dict[str, Any] = field(default_factory=dict)
     solution_competition: dict[str, Any] = field(default_factory=dict)
